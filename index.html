@@ -79,7 +79,6 @@
       </div>
     </div>
 
-    <!-- 캐릭터 추가 폼 -->
     <div class="highlight-box">
       <div style="font-weight: bold; margin-bottom: 8px; color: #1971c2;" id="activeGroupDisplay">
         작업 대상: 그룹을 먼저 선택해주세요.
@@ -122,7 +121,7 @@
   <div class="card">
     <h2>4. 보스 약속에 내 캐릭터 넣기</h2>
     <p style="font-size: 0.85rem; color: #666; margin-top: 0;">
-      내 그룹의 캐릭터들을 보스 풀에 자유롭게 넣으세요. 한 그룹의 여러 캐릭터를 동일한 보스에 모두 넣어도 괜찮습니다. (최종 시간표에서 다른 그룹의 캐릭터들과 서로 다른 시간대의 파티로 자동 분할 매칭됩니다.)
+      내 그룹의 캐릭터들을 보스 풀에 자유롭게 넣으세요. 한 그룹의 여러 캐릭터를 동일한 보스에 모두 넣어도 괜찮습니다.
     </p>
     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
       <select id="charToAssign" style="flex: 1; min-width: 160px;">
@@ -139,7 +138,7 @@
   <div class="card">
     <h2>5. 겹치지 않는 최종 시간표 생성</h2>
     <p style="font-size: 0.85rem; color: #666; margin-top: 0;">
-      보스 풀에 모인 캐릭터들을 <b>서로 다른 그룹끼리 짝을 짓고, 동일 인물은 동시간대에 겹치지 않게 분리</b>하여 연속 시간대로 파티를 결성합니다.
+      보스 풀의 캐릭터들을 서로 다른 그룹끼리 짝을 짓고, 연속 시간대를 우선 고려하여 즉시 시간표를 작성합니다.
     </p>
     <button type="button" class="btn btn-success" onclick="solveSchedule()">최종 시간표 자동 생성</button>
     <div id="scheduleResults" style="margin-top: 15px;"></div>
@@ -172,7 +171,7 @@
     if (g) groups = JSON.parse(g);
   }
 
-  // --- 시간표 렌더링 및 드래그 ---
+  // --- 시간표 드래그 UI ---
   let isMouseDown = false;
   let targetSelectionMode = true;
 
@@ -254,10 +253,10 @@
             <button type="button" class="btn btn-danger" onclick="removeBoss('${b.id}')">삭제</button>
           </div>
           <div style="font-size:0.8rem; color:#495057; margin: 4px 0;">
-            파티 조건: 요구 합산 ${b.targetScore} 이상 / 파티당 최대 ${b.count}명
+            조건: 요구 합산 ${b.targetScore} 이상 / 최대 ${b.count}명
           </div>
           <div style="margin-top:6px; border-top: 1px dashed #dee2e6; padding-top: 6px;">
-            <div style="font-size:0.75rem; color:#868e96; margin-bottom:3px;">등록된 캐릭터 풀 (총 ${b.members.length}개):</div>
+            <div style="font-size:0.75rem; color:#868e96; margin-bottom:3px;">등록된 캐릭터 풀 (${b.members.length}개):</div>
             ${b.members.length === 0 ? '<span style="font-size:0.75rem; color:#adb5bd;">(등록된 캐릭터 없음)</span>' : ''}
             ${b.members.map((m, idx) => `
               <span class="badge badge-member">
@@ -423,7 +422,6 @@
       bosses.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
   }
 
-  // --- 보스 풀에 캐릭터 넣기 (제한 전면 해제: 동일 그룹 여러 캐릭도 자유롭게 추가 가능) ---
   function assignCharToBoss() {
     if (!activeGroup) { alert('그룹을 먼저 선택하세요.'); return; }
     const charName = document.getElementById('charToAssign').value;
@@ -437,7 +435,6 @@
 
     if (!char || !boss) return;
 
-    // 완전히 동일한 단일 캐릭터의 중복 투입만 방지 (같은 그룹의 다른 캐릭터는 모두 허용)
     if (boss.members.some(m => m.group === activeGroup && m.name === charName)) {
       alert(`[${boss.name}] 보스 풀에 이미 [${charName}] 캐릭터가 들어가 있습니다.`);
       return;
@@ -449,7 +446,6 @@
     alert(`[${boss.name}] 보스 풀에 [${char.name}] 등록 완료!`);
   }
 
-  // --- 시간표 저장 및 로드 ---
   function saveCurrentGroupSchedule() {
     if (!activeGroup) { alert('그룹을 먼저 선택하세요.'); return; }
     const selectedCells = document.querySelectorAll('.slot-cell.selected');
@@ -473,167 +469,142 @@
     document.querySelectorAll('.slot-cell').forEach(c => c.classList.remove('selected'));
   }
 
-  // --- 최적 스케줄링 엔진 (풀 내 캐릭터를 서로 다른 그룹끼리 묶어 다중 파티 결성 및 연속 슬롯 배치) ---
+  // --- 초고속 최적화 스케줄링 엔진 (렉 현상 완전 해결) ---
   function solveSchedule() {
     const resultDiv = document.getElementById('scheduleResults');
     resultDiv.innerHTML = '<h3>최적 스케줄링 결과</h3>';
 
-    // 1. 각 보스별로 유효한 파티(서로 다른 그룹으로 구성 + 목표 수치 달성 + 인원수 이하) 후보들 도출
-    // 한 보스 풀에 철수 캐릭 2개, 영희 캐릭 2개가 있다면 -> 파티 A(철수1, 영희1), 파티 B(철수2, 영희2) 형태로 생성
+    // 1. 유효 파티 생성 (서로 다른 그룹 조합 매칭)
     let partyUnits = [];
 
     bosses.forEach(boss => {
-      const pool = [...boss.members];
-      let partyIndex = 1;
+      let pool = [...boss.members];
+      let pIdx = 1;
 
       while (pool.length > 0) {
-        // 그룹별로 캐릭터들을 분류
+        // 그룹별 분류
         const byGroup = {};
         pool.forEach(m => {
           if (!byGroup[m.group]) byGroup[m.group] = [];
           byGroup[m.group].push(m);
         });
 
-        // 서로 다른 그룹에서 1개씩 꺼내어 파티 생성
-        const groupNames = Object.keys(byGroup);
-        let bestSubParty = null;
+        const gNames = Object.keys(byGroup);
+        if (gNames.length === 0) break;
 
-        // 가능한 그룹 조합 탐색 (크기 1부터 boss.count까지)
-        function findGroupCombo(start, currentMembers) {
-          const sum = currentMembers.reduce((acc, m) => acc + m.score, 0);
-          if (sum >= boss.targetScore && currentMembers.length <= boss.count) {
-            if (!bestSubParty || currentMembers.length < bestSubParty.length) {
-              bestSubParty = [...currentMembers];
+        let bestCombo = null;
+
+        // 인원수 이하 조합 탐색 (경우의 수 제한)
+        function findCombo(start, current) {
+          const sum = current.reduce((s, m) => s + m.score, 0);
+          if (sum >= boss.targetScore && current.length <= boss.count) {
+            if (!bestCombo || current.length < bestCombo.length) {
+              bestCombo = [...current];
             }
+            return;
           }
-          if (currentMembers.length >= boss.count) return;
+          if (current.length >= boss.count) return;
 
-          for (let i = start; i < groupNames.length; i++) {
-            const g = groupNames[i];
-            const charObj = byGroup[g][0]; // 해당 그룹의 첫번째 가용 캐릭
-            currentMembers.push(charObj);
-            findGroupCombo(i + 1, currentMembers);
-            currentMembers.pop();
+          for (let i = start; i < gNames.length; i++) {
+            current.push(byGroup[gNames[i]][0]);
+            findCombo(i + 1, current);
+            current.pop();
+            if (bestCombo) break; // 조기 종료로 지연 방지
           }
         }
 
-        findGroupCombo(0, []);
+        findCombo(0, []);
 
-        if (bestSubParty) {
+        if (bestCombo) {
           partyUnits.push({
-            id: `${boss.id}_p${partyIndex++}`,
+            id: `${boss.id}_${pIdx++}`,
             bossName: boss.name,
             targetScore: boss.targetScore,
-            members: bestSubParty
+            members: bestCombo
           });
-          // 선발된 캐릭터들은 풀에서 제거
-          bestSubParty.forEach(selected => {
-            const idx = pool.findIndex(m => m.group === selected.group && m.name === selected.name);
+          // 풀에서 제거
+          bestCombo.forEach(sel => {
+            const idx = pool.findIndex(m => m.group === sel.group && m.name === sel.name);
             if (idx !== -1) pool.splice(idx, 1);
           });
         } else {
-          // 더 이상 유효한 파티(목표 스펙 충족)를 만들 수 없으면 종료
           break;
         }
       }
     });
 
     if (partyUnits.length === 0) {
-      resultDiv.innerHTML += '<p style="color:#fa5252;">서로 다른 그룹의 캐릭터들을 조합하여 목표 스펙을 달성하는 출발 가능 파티를 만들 수 없습니다. 보스 풀에 다른 그룹의 캐릭터를 더 등록하거나 목표치를 조정해주세요.</p>';
+      resultDiv.innerHTML += '<p style="color:#fa5252;">서로 다른 그룹을 조합하여 목표 스펙을 충족하는 파티를 구성할 수 없습니다. 보스 풀에 다른 그룹의 캐릭터를 추가하거나 목표치를 낮춰주세요.</p>';
       return;
     }
 
-    // 2. 파티 단위로 20분 슬롯에 배치 (동일 시간대 보스 간 충돌 방지 + 동일 유저 동시간대 참여 방지 + 연속성 최적화)
+    // 2. 고유 타임슬롯 생성
     const allSlots = [];
     days.forEach((_, dIdx) => {
       timeSlots.forEach((slot, sIdx) => {
-        allSlots.push({ dayIdx: dIdx, time: slot, slotIdx: sIdx, key: `${dIdx}_${slot}` });
+        allSlots.push({ dayIdx: dIdx, time: slot, slotIdx: sIdx, key: `${dIdx}_${slot}`, linearIdx: dIdx * 1000 + sIdx });
       });
     });
 
-    let bestSchedule = null;
-    let maxScore = -1;
+    // 3. 교집합 기반 그리디(Greedy) + 연속성 최적화 스케줄링 (즉각 연산)
+    const finalAssignments = [];
+    const usedSlotKeys = new Set();
+    const usedGroupSlots = new Set();
+    const userTimeline = {}; // { group: [linearIdx] }
 
-    function evaluateContinuity(assignments) {
-      let score = 0;
-      const userTimeline = {};
-
-      assignments.forEach(item => {
-        item.party.members.forEach(m => {
-          if (!userTimeline[m.group]) userTimeline[m.group] = [];
-          userTimeline[m.group].push(item.slot.dayIdx * 1000 + item.slot.slotIdx);
+    for (let party of partyUnits) {
+      // 파티원 전원의 공통 가능 슬롯만 추출 (탐색 범위 대폭 압축)
+      const commonSlots = allSlots.filter(slot => {
+        if (usedSlotKeys.has(slot.key)) return false;
+        return party.members.every(m => {
+          const grp = groups[m.group];
+          return grp && grp.schedule && grp.schedule.includes(slot.key) && !usedGroupSlots.has(`${m.group}_${slot.key}`);
         });
       });
 
-      Object.values(userTimeline).forEach(timeline => {
-        timeline.sort((a, b) => a - b);
-        for (let i = 0; i < timeline.length - 1; i++) {
-          if (timeline[i + 1] - timeline[i] === 1) {
-            score += 25; // 20분 연속 진행 보너스
-          }
-        }
-      });
-      return score;
-    }
-
-    function search(partyIdx, currentAssignments, usedSlotKeys, usedGroupSlots) {
-      if (partyIdx === partyUnits.length) {
-        const score = evaluateContinuity(currentAssignments);
-        if (score > maxScore) {
-          maxScore = score;
-          bestSchedule = JSON.parse(JSON.stringify(currentAssignments));
-        }
+      if (commonSlots.length === 0) {
+        resultDiv.innerHTML += `<p style="color:#fa5252;"><b>[${party.bossName}]</b> 파티의 구성원 전원이 공통으로 가능한 빈 시간대가 없습니다. 주간 가능 시간을 더 선택해주세요.</p>`;
         return;
       }
 
-      const party = partyUnits[partyIdx];
+      // 연속성 점수가 가장 높은 슬롯 선택
+      let bestSlot = commonSlots[0];
+      let maxBonus = -1;
 
-      for (let s = 0; s < allSlots.length; s++) {
-        const slot = allSlots[s];
-
-        // 동일 슬롯에 다른 파티가 진행 중이면 건너뜀 (시간대 충돌 방지)
-        if (usedSlotKeys.has(slot.key)) continue;
-
-        // 파티원(그룹) 전원이 해당 슬롯에 출석 가능하며, 다른 약속에 들어가 있지 않은지 확인
-        let canAllJoin = true;
-        for (let m of party.members) {
-          const grp = groups[m.group];
-          const hasSchedule = grp && grp.schedule && grp.schedule.includes(slot.key);
-          if (!hasSchedule || usedGroupSlots.has(`${m.group}_${slot.key}`)) {
-            canAllJoin = false;
-            break;
+      for (let slot of commonSlots) {
+        let bonus = 0;
+        party.members.forEach(m => {
+          const userSlots = userTimeline[m.group] || [];
+          // 바로 앞 시간이나 뒤 시간과 맞닿아 있는지 확인
+          if (userSlots.includes(slot.linearIdx - 1) || userSlots.includes(slot.linearIdx + 1)) {
+            bonus += 50; // 연속 보너스 가산점
           }
-        }
+        });
 
-        if (canAllJoin) {
-          usedSlotKeys.add(slot.key);
-          party.members.forEach(m => usedGroupSlots.add(`${m.group}_${slot.key}`));
-          currentAssignments.push({ party, slot });
-
-          search(partyIdx + 1, currentAssignments, usedSlotKeys, usedGroupSlots);
-
-          currentAssignments.pop();
-          party.members.forEach(m => usedGroupSlots.delete(`${m.group}_${slot.key}`));
-          usedSlotKeys.delete(slot.key);
-
-          if (bestSchedule && maxScore > 0 && partyIdx === 0) break;
+        if (bonus > maxBonus) {
+          maxBonus = bonus;
+          bestSlot = slot;
         }
       }
+
+      // 확정 배치
+      usedSlotKeys.add(bestSlot.key);
+      party.members.forEach(m => {
+        usedGroupSlots.add(`${m.group}_${bestSlot.key}`);
+        if (!userTimeline[m.group]) userTimeline[m.group] = [];
+        userTimeline[m.group].push(bestSlot.linearIdx);
+      });
+
+      finalAssignments.push({ party, slot: bestSlot });
     }
 
-    search(0, [], new Set(), new Set());
-
-    if (!bestSchedule || bestSchedule.length === 0) {
-      resultDiv.innerHTML += '<p style="color:#fa5252;">결성된 파티원들의 가능 시간대가 서로 맞지 않아 최종 시간표를 생성할 수 없습니다. 참여자들의 주간 가능 시간대를 넓혀주세요.</p>';
-      return;
-    }
-
-    bestSchedule.sort((a, b) => {
+    // 4. 결과 출력
+    finalAssignments.sort((a, b) => {
       if (a.slot.dayIdx !== b.slot.dayIdx) return a.slot.dayIdx - b.slot.dayIdx;
       return a.slot.slotIdx - b.slot.slotIdx;
     });
 
-    bestSchedule.forEach((item, idx) => {
+    finalAssignments.forEach((item, idx) => {
       const sum = item.party.members.reduce((acc, m) => acc + m.score, 0).toFixed(1);
       const membersText = item.party.members.map(m => `<b>[${m.group}]</b> ${m.name}(${m.score})`).join(', ');
 
