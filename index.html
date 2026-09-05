@@ -88,27 +88,32 @@
         <div id="groupActiveArea" style="display: none; border-top: 2px dashed #dee2e6; padding-top: 12px;">
           <h3 id="currentGroupTitle" style="margin-top: 0; color: #1971c2;"></h3>
           
-          <!-- 캐릭터 추가 -->
+          <!-- 캐릭터 추가 및 저장 -->
           <div class="form-group">
-            <label>내 캐릭터 추가 (계속해서 추가 가능)</label>
+            <label>내 캐릭터 추가 및 저장 (계속해서 추가 가능)</label>
             <div style="display: flex; gap: 6px;">
               <input type="text" id="charName" placeholder="캐릭명 (예: 캐릭1)" style="flex: 2;">
               <input type="number" id="charScore" step="0.1" placeholder="수치 (예: 6.0)" style="flex: 1;">
-              <button type="button" class="btn btn-primary" onclick="addCharToGroup()">추가</button>
+              <button type="button" class="btn btn-primary" onclick="saveCharacterToGroup()">캐릭터 저장</button>
             </div>
+            <!-- 저장된 캐릭터 목록 확인 -->
             <div id="groupCharList" style="margin-top: 8px;"></div>
           </div>
 
-          <!-- 보스 약속에 캐릭터 배치 (한 캐릭터가 여러 보스에 등록 가능) -->
+          <!-- 보스 약속에 캐릭터 배치 -->
           <div class="form-group" style="border-top: 1px solid #eee; padding-top: 10px;">
-            <label>보스 약속에 내 캐릭터 등록 (여러 보스에 참여 가능)</label>
+            <label>보스 약속에 내 캐릭터 등록</label>
             <div style="display: flex; gap: 6px;">
-              <select id="charToAssign" style="flex: 1;"></select>
-              <select id="bossToAssign" style="flex: 1;"></select>
+              <select id="charToAssign" style="flex: 1;">
+                <option value="">캐릭터를 선택하세요</option>
+              </select>
+              <select id="bossToAssign" style="flex: 1;">
+                <option value="">보스를 선택하세요</option>
+              </select>
               <button type="button" class="btn btn-primary" onclick="assignCharToBoss()">배치</button>
             </div>
             <p style="font-size: 0.75rem; color: #868e96; margin-top: 4px;">
-              * 같은 캐릭터라도 서로 다른 보스 약속에 여러 번 배치할 수 있습니다.
+              * 같은 캐릭터라도 다른 보스 약속에 여러 번 배치할 수 있습니다.
             </p>
           </div>
         </div>
@@ -151,7 +156,7 @@
 <script>
   // --- 상태 관리 ---
   let bosses = []; 
-  let groups = {}; // { '철수': { chars: [{ name, score }], schedule: Set(['0_18:00']) } }
+  let groups = {}; // { '철수': { chars: [{ name, score }], schedule: ['0_18:00'] } }
   let activeGroup = null;
 
   // 목요일(0) ~ 다음 주 수요일(6)
@@ -163,7 +168,20 @@
     }
   }
 
-  // --- 주간 시간표 UI 및 마우스 드래그 로직 ---
+  // --- 로컬 스토리지 데이터 동기화 (새로고침 시 유지) ---
+  function saveData() {
+    localStorage.setItem('raid_bosses', JSON.stringify(bosses));
+    localStorage.setItem('raid_groups', JSON.stringify(groups));
+  }
+
+  function loadData() {
+    const savedBosses = localStorage.getItem('raid_bosses');
+    const savedGroups = localStorage.getItem('raid_groups');
+    if (savedBosses) bosses = JSON.parse(savedBosses);
+    if (savedGroups) groups = JSON.parse(savedGroups);
+  }
+
+  // --- 주간 시간표 UI 생성 및 마우스 드래그 로직 ---
   let isMouseDown = false;
   let targetSelectionMode = true;
 
@@ -217,11 +235,12 @@
     const count = parseInt(countVal, 10);
 
     if (!name || isNaN(score) || isNaN(count) || count <= 0) {
-      alert('보스 정보(이름, 필요 수치, 올바른 인원수)를 모두 입력하세요.');
+      alert('보스 정보(이름, 필요 수치, 인원수)를 올바르게 입력하세요.');
       return;
     }
 
     bosses.push({ id: 'b_' + Date.now(), name, targetScore: score, count, members: [] });
+    saveData();
     renderBosses();
     updateBossAssignSelect();
 
@@ -232,6 +251,7 @@
 
   function removeBoss(id) {
     bosses = bosses.filter(b => b.id !== id);
+    saveData();
     renderBosses();
     updateBossAssignSelect();
   }
@@ -270,17 +290,19 @@
     const boss = bosses.find(b => b.id === bossId);
     if (boss) {
       boss.members.splice(index, 1);
+      saveData();
       renderBosses();
     }
   }
 
-  // --- 그룹 및 다중 캐릭터 관리 ---
+  // --- 그룹 및 캐릭터 관리 ---
   function createNewGroup() {
     const name = document.getElementById('newGroupName').value.trim();
     if (!name) { alert('그룹명을 입력하세요.'); return; }
-    if (groups[name]) { alert('이미 존재하는 그룹명입니다. 드롭다운에서 선택하세요.'); return; }
+    if (groups[name]) { alert('이미 존재하는 그룹명입니다.'); return; }
 
-    groups[name] = { chars: [], schedule: new Set() };
+    groups[name] = { chars: [], schedule: [] };
+    saveData();
     document.getElementById('newGroupName').value = '';
     
     updateGroupDropdown();
@@ -327,12 +349,14 @@
 
     delete groups[activeGroup];
     activeGroup = null;
+    saveData();
     updateGroupDropdown();
     switchGroup(null);
     renderBosses();
   }
 
-  function addCharToGroup() {
+  // 캐릭터 저장 함수
+  function saveCharacterToGroup() {
     if (!activeGroup) {
       alert('그룹을 먼저 선택하세요.');
       return;
@@ -347,22 +371,28 @@
       alert('캐릭터 이름과 수치를 올바르게 입력하세요.');
       return;
     }
+
+    if (!groups[activeGroup].chars) {
+      groups[activeGroup].chars = [];
+    }
+
     if (groups[activeGroup].chars.some(c => c.name === name)) {
       alert('이미 동일한 이름의 캐릭터가 현재 그룹에 존재합니다.');
       return;
     }
 
-    // 캐릭터 객체 저장
+    // 캐릭터 추가 후 저장
     groups[activeGroup].chars.push({ name, score });
-    
-    // UI 및 셀렉트 갱신
+    saveData();
+
+    // UI 및 드롭다운 갱신
     renderGroupChars();
     updateCharAssignSelect();
 
-    // 입력 필드 초기화
     nameInput.value = '';
     scoreInput.value = '';
     nameInput.focus();
+    alert(`[${name}] 캐릭터가 성공적으로 저장되었습니다.`);
   }
 
   function removeCharFromGroup(charName) {
@@ -372,6 +402,7 @@
       b.members = b.members.filter(m => !(m.group === activeGroup && m.name === charName));
     });
 
+    saveData();
     renderGroupChars();
     updateCharAssignSelect();
     renderBosses();
@@ -379,7 +410,7 @@
 
   function renderGroupChars() {
     const container = document.getElementById('groupCharList');
-    if (!activeGroup || !groups[activeGroup]) {
+    if (!activeGroup || !groups[activeGroup] || !groups[activeGroup].chars) {
       container.innerHTML = '';
       return;
     }
@@ -393,16 +424,25 @@
 
   function updateCharAssignSelect() {
     const sel = document.getElementById('charToAssign');
-    if (!activeGroup || !groups[activeGroup]) { sel.innerHTML = ''; return; }
-    sel.innerHTML = groups[activeGroup].chars.map(c => `<option value="${c.name}">${c.name} (${c.score})</option>`).join('');
+    if (!activeGroup || !groups[activeGroup] || !groups[activeGroup].chars || groups[activeGroup].chars.length === 0) {
+      sel.innerHTML = '<option value="">-- 등록된 캐릭터 없음 --</option>';
+      return;
+    }
+    sel.innerHTML = '<option value="">-- 캐릭터 선택 --</option>' + 
+      groups[activeGroup].chars.map(c => `<option value="${c.name}">${c.name} (${c.score})</option>`).join('');
   }
 
   function updateBossAssignSelect() {
     const sel = document.getElementById('bossToAssign');
-    sel.innerHTML = bosses.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+    if (bosses.length === 0) {
+      sel.innerHTML = '<option value="">-- 등록된 보스 없음 --</option>';
+      return;
+    }
+    sel.innerHTML = '<option value="">-- 보스 선택 --</option>' + 
+      bosses.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
   }
 
-  // --- 캐릭터를 보스에 배치 (한 캐릭터가 여러 보스에 등록 가능) ---
+  // --- 캐릭터를 보스에 배치 ---
   function assignCharToBoss() {
     if (!activeGroup) {
       alert('그룹을 먼저 선택하세요.');
@@ -412,11 +452,11 @@
     const bossId = document.getElementById('bossToAssign').value;
 
     if (!charName) {
-      alert('배치할 캐릭터를 선택하세요. (캐릭터를 먼저 추가해야 합니다)');
+      alert('배치할 캐릭터를 선택하세요.');
       return;
     }
     if (!bossId) {
-      alert('배치할 보스를 선택하세요. (보스를 먼저 생성해야 합니다)');
+      alert('배치할 보스를 선택하세요.');
       return;
     }
 
@@ -425,9 +465,8 @@
 
     if (!char || !boss) return;
 
-    // 규칙: 한 보스 약속 안에는 동일 그룹(한 사람)이 중복 참여할 수 없음
     if (boss.members.some(m => m.group === activeGroup)) {
-      alert(`[${boss.name}] 보스에는 이미 ${activeGroup} 님의 캐릭터가 참여 중입니다.\n(한 보스 파티 내 중복 참여 불가)`);
+      alert(`[${boss.name}] 보스에는 이미 ${activeGroup} 님의 캐릭터가 참여 중입니다.\n(동일 보스 파티 내 중복 참여 불가)`);
       return;
     }
 
@@ -436,25 +475,27 @@
       return;
     }
 
-    // 캐릭터 배치 (다른 보스에 이미 등록되어 있어도 상관없이 추가됨)
     boss.members.push({ group: activeGroup, name: char.name, score: char.score });
+    saveData();
     renderBosses();
-    alert(`[${boss.name}] 보스에 [${char.name}] 캐릭터가 성공적으로 배치되었습니다.`);
+    alert(`[${boss.name}]에 [${char.name}] 배치가 완료되었습니다.`);
   }
 
   function saveCurrentGroupSchedule() {
     if (!activeGroup) { alert('그룹을 먼저 선택하세요.'); return; }
     const selectedCells = document.querySelectorAll('.slot-cell.selected');
-    groups[activeGroup].schedule = new Set();
+    const scheduleArr = [];
     selectedCells.forEach(cell => {
-      groups[activeGroup].schedule.add(cell.getAttribute('data-key'));
+      scheduleArr.push(cell.getAttribute('data-key'));
     });
+    groups[activeGroup].schedule = scheduleArr;
+    saveData();
     alert(`[${activeGroup}] 그룹의 주간 가능 시간대가 저장되었습니다.`);
   }
 
   function loadGroupSchedule() {
     clearScheduleUI();
-    if (!activeGroup || !groups[activeGroup]) return;
+    if (!activeGroup || !groups[activeGroup] || !groups[activeGroup].schedule) return;
 
     groups[activeGroup].schedule.forEach(key => {
       const cell = document.querySelector(`.slot-cell[data-key="${key}"]`);
@@ -478,7 +519,7 @@
     });
 
     if (validBosses.length === 0) {
-      resultDiv.innerHTML += '<p style="color:#fa5252;">정원과 필요 스펙 수치를 모두 채운 완료 상태의 보스가 없습니다. 파티원 배치를 완료해주세요.</p>';
+      resultDiv.innerHTML += '<p style="color:#fa5252;">정원과 필요 스펙 수치를 모두 채운 완료 상태의 보스가 없습니다. 보스 파티 구성을 먼저 완료해주세요.</p>';
       return;
     }
 
@@ -507,7 +548,7 @@
         timeline.sort((a, b) => a - b);
         for (let i = 0; i < timeline.length - 1; i++) {
           if (timeline[i + 1] - timeline[i] === 1) {
-            score += 20; // 연속 보너스
+            score += 20;
           }
         }
       });
@@ -534,7 +575,8 @@
         let canAllJoin = true;
         for (let m of boss.members) {
           const grp = groups[m.group];
-          if (!grp || !grp.schedule.has(slot.key)) {
+          const hasSchedule = grp && grp.schedule && grp.schedule.includes(slot.key);
+          if (!hasSchedule) {
             canAllJoin = false;
             break;
           }
@@ -563,7 +605,7 @@
     search(0, [], new Set(), new Set());
 
     if (!bestSchedule || bestSchedule.length === 0) {
-      resultDiv.innerHTML += '<p style="color:#fa5252;">참여자들의 가능 시간대가 겹치지 않아 보스 일정을 생성할 수 없습니다. 각 그룹의 주간 가능 시간을 더 넓혀주세요.</p>';
+      resultDiv.innerHTML += '<p style="color:#fa5252;">참여자들의 가능 시간대가 겹치지 않아 보스 일정을 생성할 수 없습니다. 참여자들의 가능 시간을 더 넓혀주세요.</p>';
       return;
     }
 
@@ -590,8 +632,13 @@
     });
   }
 
+  // 브라우저 로딩 시 초기화
   window.onload = () => {
+    loadData();
     initTimetable();
+    renderBosses();
+    updateGroupDropdown();
+    updateBossAssignSelect();
   };
 </script>
 </body>
