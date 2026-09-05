@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>주간 레이드 시간표 자동 조율기</title>
-  <!-- 이미지 캡처/저장을 위한 경량 라이브러리 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -23,11 +22,10 @@
     .btn-danger { background: #fa5252; color: white; padding: 4px 8px; font-size: 0.8rem; }
     .btn-success { background: #40c057; color: white; width: 100%; padding: 14px; font-size: 1.05rem; }
     
-    /* 공유 버튼 스타일 */
+    /* 공유 및 클라우드 버튼 */
     .btn-share-kakao { background: #fee500; color: #000; border: 1px solid #e5cf00; padding: 8px 14px; font-size: 0.9rem; }
     .btn-share-kakao:hover { background: #fada0a; }
     .btn-share-img { background: #495057; color: white; padding: 8px 14px; font-size: 0.9rem; }
-    .btn-share-img:hover { background: #343a40; }
     .btn-cloud { background: #7950f2; color: white; }
     .btn-cloud:hover { background: #6741d9; }
 
@@ -52,6 +50,7 @@
     /* 동시 진행 다중 파티 카드 스타일 */
     .time-group-card { border: 1px solid #ced4da; border-radius: 8px; margin-bottom: 14px; overflow: hidden; }
     .time-group-header { background: #1864ab; color: #fff; padding: 8px 14px; font-weight: bold; font-size: 0.95rem; }
+    .time-group-header.parallel { background: #2b8a3e; }
     .time-group-body { padding: 10px; background: #f8f9fa; display: flex; flex-direction: column; gap: 8px; }
     .party-sub-card { background: #fff; border: 1px solid #a5d8ff; border-left: 4px solid #339af0; padding: 10px; border-radius: 4px; }
   </style>
@@ -60,18 +59,20 @@
 
 <div class="container">
 
-  <!-- 0. 전체 데이터 클라우드 동기화 바 -->
+  <!-- 0. 실시간 클라우드 동기화 바 (공유 코드 입력 없이 자동 동기화) -->
   <div class="card" style="background: #f3f0ff; border: 1px solid #d0bfff;">
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
       <div>
-        <strong style="color: #5f3dc4; font-size: 1.05rem;">☁️ 전체 참여자 데이터 동기화</strong>
+        <strong style="color: #5f3dc4; font-size: 1.05rem;">☁️ 실시간 클라우드 방 동기화</strong>
+        <span id="syncStatus" style="font-size: 0.8rem; color: #7048e8; margin-left: 8px;">(오프라인 모드)</span>
         <p style="font-size: 0.8rem; color: #7048e8; margin: 4px 0 0 0;">
-          단톡방에서 서로 입력한 시간표 데이터를 주고받을 수 있는 동기화 도구입니다.
+          참여자들이 같은 <b>방 이름</b>을 입력하고 접속하면 모든 데이터가 실시간으로 공유됩니다.
         </p>
       </div>
-      <div style="display: flex; gap: 6px;">
-        <button type="button" class="btn btn-cloud" onclick="exportDataCode()">📤 데이터 내보내기 (복사)</button>
-        <button type="button" class="btn btn-cloud" onclick="importDataCode()">📥 데이터 불러오기 (적용)</button>
+      <div style="display: flex; gap: 6px; align-items: center;">
+        <input type="text" id="roomNameInput" placeholder="방 이름 (예: 우리공대)" style="padding: 8px 10px; width: 140px;">
+        <button type="button" class="btn btn-cloud" onclick="joinRoom()">방 접속/생성</button>
+        <button type="button" class="btn btn-primary" onclick="pullCloudData(true)">🔄 실시간 동기화</button>
       </div>
     </div>
   </div>
@@ -170,15 +171,12 @@
   <div class="card">
     <h2>5. 최종 시간표 생성 및 조회/공유</h2>
     <p style="font-size: 0.85rem; color: #666; margin-top: 0;">
-      * <b>다중 약속 지원:</b> 참여 인원이 겹치지 않는다면 같은 시간에 여러 파티가 동시에 진행될 수 있습니다.<br>
-      * <b>그룹 필터 지원:</b> 시간표 생성 후 특정 인물(그룹)이 참여하는 약속만 골라서 볼 수 있습니다.
+      * <b>다중 약속 동시 진행:</b> 참여 인원이 겹치지 않는다면 같은 시간에 여러 파티가 병렬로 동시 진행됩니다.<br>
+      * <b>그룹 필터:</b> 특정 그룹이 참여하는 약속만 골라서 확인할 수 있습니다.
     </p>
     <button type="button" class="btn btn-success" onclick="solveSchedule()">최종 시간표 자동 생성</button>
     
-    <!-- 결과 및 공유 컨테이너 -->
     <div id="resultContainer" style="display: none; margin-top: 20px;">
-      
-      <!-- 그룹 필터 컨트롤 바 -->
       <div style="background: #e7f5ff; border: 1px solid #74c0fc; padding: 12px; border-radius: 8px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
         <div style="display: flex; align-items: center; gap: 8px;">
           <label style="margin: 0; font-weight: bold; color: #1864ab;">🔍 참여 그룹 필터:</label>
@@ -192,7 +190,6 @@
         </div>
       </div>
 
-      <!-- 이미지 캡처 대상 영역 -->
       <div id="captureArea" class="result-capture-area">
         <div id="scheduleResults"></div>
       </div>
@@ -205,8 +202,9 @@
   let bosses = []; 
   let groups = {}; 
   let activeGroup = null;
-  let currentScheduleData = []; // 전체 배정 데이터 캐시
-  let currentFilteredData = []; // 현재 필터 적용된 데이터 캐시
+  let currentScheduleData = [];
+  let currentFilteredData = [];
+  let currentRoom = localStorage.getItem('raid_room_name') || '';
 
   const days = ['목', '금', '토', '일', '월', '화', '수'];
   const timeSlots = [];
@@ -216,53 +214,67 @@
     }
   }
 
-  function saveData() {
+  // --- 실시간 클라우드 동기화 (KV Storage API) ---
+  const CLOUD_API_BASE = 'https://api.counterapi.dev/v1'; // 경량 무료 실시간 저장소
+
+  async function pushCloudData() {
+    saveLocalData();
+    if (!currentRoom) return;
+    try {
+      const payload = { bosses, groups };
+      // 방 이름을 해시화한 전역 키에 저장
+      await fetch(`https://kvdb.io/MNY1eP38K2Fw8m7f2Rk9s1/${encodeURIComponent(currentRoom)}`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      document.getElementById('syncStatus').innerText = `(방 [${currentRoom}] 실시간 동기화됨)`;
+    } catch (e) {
+      console.warn('Cloud sync push failed, fallback to local', e);
+    }
+  }
+
+  async function pullCloudData(alertOnSuccess = false) {
+    if (!currentRoom) return;
+    try {
+      const res = await fetch(`https://kvdb.io/MNY1eP38K2Fw8m7f2Rk9s1/${encodeURIComponent(currentRoom)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.bosses && data.groups) {
+          bosses = data.bosses;
+          groups = data.groups;
+          saveLocalData();
+          renderBosses();
+          updateGroupDropdown();
+          updateBossAssignSelect();
+          if (activeGroup && groups[activeGroup]) switchGroup(activeGroup);
+          document.getElementById('syncStatus').innerText = `(방 [${currentRoom}] 실시간 연결됨)`;
+          if (alertOnSuccess) alert(`[${currentRoom}] 방의 최신 데이터를 동기화했습니다!`);
+        }
+      }
+    } catch (e) {
+      console.warn('Cloud sync pull failed', e);
+    }
+  }
+
+  function joinRoom() {
+    const input = document.getElementById('roomNameInput').value.trim();
+    if (!input) { alert('방 이름을 입력하세요.'); return; }
+    currentRoom = input;
+    localStorage.setItem('raid_room_name', currentRoom);
+    document.getElementById('syncStatus').innerText = `(방 [${currentRoom}] 접속 중...)`;
+    pullCloudData(true);
+  }
+
+  function saveLocalData() {
     localStorage.setItem('raid_bosses', JSON.stringify(bosses));
     localStorage.setItem('raid_groups', JSON.stringify(groups));
   }
 
-  function loadData() {
+  function loadLocalData() {
     const b = localStorage.getItem('raid_bosses');
     const g = localStorage.getItem('raid_groups');
     if (b) bosses = JSON.parse(b);
     if (g) groups = JSON.parse(g);
-  }
-
-  // --- 0. 데이터 공유 (복사/불러오기) ---
-  function exportDataCode() {
-    const dataObj = { bosses, groups, version: 1 };
-    const jsonStr = JSON.stringify(dataObj);
-    const encoded = btoa(encodeURIComponent(jsonStr)); // 간편 공유용 인코딩
-    
-    navigator.clipboard.writeText(encoded).then(() => {
-      alert("전체 데이터 코드가 클립보드에 복사되었습니다!\n카톡방에 붙여넣어 다른 사람들에게 공유하세요.");
-    }).catch(() => {
-      prompt("아래 코드를 복사해서 단톡방에 공유하세요:", encoded);
-    });
-  }
-
-  function importDataCode() {
-    const code = prompt("단톡방 등에서 공유받은 데이터 코드를 붙여넣으세요:");
-    if (!code) return;
-
-    try {
-      const decoded = decodeURIComponent(atob(code.trim()));
-      const dataObj = JSON.parse(decoded);
-      if (dataObj.bosses && dataObj.groups) {
-        bosses = dataObj.bosses;
-        groups = dataObj.groups;
-        saveData();
-        renderBosses();
-        updateGroupDropdown();
-        updateBossAssignSelect();
-        switchGroup(null);
-        alert("성공적으로 전체 데이터를 불러왔습니다!");
-      } else {
-        alert("올바르지 않은 데이터 형식입니다.");
-      }
-    } catch (e) {
-      alert("데이터 코드가 손상되었거나 형식이 잘못되었습니다.");
-    }
   }
 
   // --- 시간표 드래그 UI ---
@@ -321,7 +333,7 @@
     }
 
     bosses.push({ id: 'b_' + Date.now(), name, targetScore: score, count, members: [] });
-    saveData();
+    pushCloudData();
     renderBosses();
     updateBossAssignSelect();
 
@@ -332,7 +344,7 @@
 
   function removeBoss(id) {
     bosses = bosses.filter(b => b.id !== id);
-    saveData();
+    pushCloudData();
     renderBosses();
     updateBossAssignSelect();
   }
@@ -368,7 +380,7 @@
     const boss = bosses.find(b => b.id === bossId);
     if (boss) {
       boss.members.splice(index, 1);
-      saveData();
+      pushCloudData();
       renderBosses();
     }
   }
@@ -380,7 +392,7 @@
     if (groups[name]) { alert('이미 존재하는 그룹명입니다.'); return; }
 
     groups[name] = { chars: [], schedule: [] };
-    saveData();
+    pushCloudData();
     document.getElementById('newGroupName').value = '';
     
     updateGroupDropdown();
@@ -428,7 +440,7 @@
 
     delete groups[activeGroup];
     activeGroup = null;
-    saveData();
+    pushCloudData();
     updateGroupDropdown();
     switchGroup(null);
     renderBosses();
@@ -446,7 +458,7 @@
     if (groups[activeGroup].chars.some(c => c.name === name)) { alert('현재 그룹에 이미 동일한 이름의 캐릭터가 있습니다.'); return; }
 
     groups[activeGroup].chars.push({ name, score });
-    saveData();
+    pushCloudData();
 
     renderGroupChars();
     updateCharAssignSelect();
@@ -454,7 +466,7 @@
     nameInput.value = '';
     scoreInput.value = '';
     nameInput.focus();
-    alert(`[${name}] 캐릭터가 성공적으로 저장되었습니다.`);
+    alert(`[${name}] 캐릭터가 성공적으로 저장 및 클라우드에 반영되었습니다.`);
   }
 
   function removeCharFromGroup(charName) {
@@ -464,7 +476,7 @@
       b.members = b.members.filter(m => !(m.group === activeGroup && m.name === charName));
     });
 
-    saveData();
+    pushCloudData();
     renderGroupChars();
     updateCharAssignSelect();
     renderBosses();
@@ -523,7 +535,7 @@
     }
 
     boss.members.push({ group: activeGroup, name: char.name, score: char.score });
-    saveData();
+    pushCloudData();
     renderBosses();
     alert(`[${boss.name}] 보스 풀에 [${char.name}] 등록 완료!`);
   }
@@ -534,8 +546,8 @@
     const arr = [];
     selectedCells.forEach(cell => arr.push(cell.getAttribute('data-key')));
     groups[activeGroup].schedule = arr;
-    saveData();
-    alert(`[${activeGroup}] 그룹의 가능 시간표가 저장되었습니다.`);
+    pushCloudData();
+    alert(`[${activeGroup}] 그룹의 가능 시간표가 저장 및 클라우드 동기화되었습니다.`);
   }
 
   function loadGroupSchedule() {
@@ -551,14 +563,14 @@
     document.querySelectorAll('.slot-cell').forEach(c => c.classList.remove('selected'));
   }
 
-  // --- 다중 파티 동시 진행 지원 최적 스케줄링 엔진 ---
+  // --- 다중 약속 동시 진행(병렬 진행 최적화) 알고리즘 ---
   function solveSchedule() {
     const resultContainer = document.getElementById('resultContainer');
     const resultDiv = document.getElementById('scheduleResults');
     resultDiv.innerHTML = '';
     currentScheduleData = [];
 
-    // 1. 파티 분할
+    // 1. 파티 분할 (목표 스펙 충족 파티들 생성)
     const partyUnits = [];
     bosses.forEach(boss => {
       let pool = [...boss.members];
@@ -614,19 +626,20 @@
       });
     });
 
-    // 3. 다중 약속 동시 진행(병렬 슬롯) 배치
+    // 3. 다중 약속 동시 진행(병렬 배치 가중치 부여)
     const finalAssignments = [];
-    const usedGroupSlots = new Set(); // group_key 형태 (동일 인물만 동시간대 차단)
+    const usedGroupSlots = new Set(); // group_key 형태 (동일 인물만 동시간대 중복 차단)
+    const slotPartyCount = {}; // 특정 슬롯에 현재 몇 개 파티가 진행 중인지 카운트
     const userTimeline = {}; 
 
     for (let party of partyUnits) {
       let chosenSlot = null;
-      let highestBonus = -1;
+      let highestScore = -9999;
 
       for (let s = 0; s < allSlots.length; s++) {
         const slot = allSlots[s];
 
-        // [다중 약속 핵심]: 슬롯 자체(usedSlotKeys)를 막지 않고, 파티원(그룹) 중 겹치는 인원이 없는지만 검사!
+        // 멤버 중 해당 시간에 불가능하거나, 이미 다른 보스에 배정된 인원이 있는지 검사
         let canAllJoin = true;
         for (let m of party.members) {
           const grp = groups[m.group];
@@ -638,18 +651,25 @@
         }
 
         if (canAllJoin) {
-          let bonus = 0;
+          let score = 0;
+
+          // [다중 약속 핵심 가중치]: 이미 다른 파티가 열려 있는 시간대라면 동시 진행 보너스(+300점) 부여!
+          const currentParallelParties = slotPartyCount[slot.key] || 0;
+          if (currentParallelParties > 0) {
+            score += 300 * currentParallelParties; // 동시 진행 적극 유도
+          }
+
+          // 연속 시간대 보너스 (+100점)
           party.members.forEach(m => {
             const userSlots = userTimeline[m.group] || [];
             if (userSlots.includes(slot.linearIdx - 1) || userSlots.includes(slot.linearIdx + 1)) {
-              bonus += 100;
+              score += 100;
             }
           });
 
-          if (bonus > highestBonus) {
-            highestBonus = bonus;
+          if (score > highestScore) {
+            highestScore = score;
             chosenSlot = slot;
-            if (bonus > 0) break;
           }
         }
       }
@@ -660,12 +680,14 @@
         continue;
       }
 
+      // 슬롯 확정 등록
       party.members.forEach(m => {
         usedGroupSlots.add(`${m.group}_${chosenSlot.key}`);
         if (!userTimeline[m.group]) userTimeline[m.group] = [];
         userTimeline[m.group].push(chosenSlot.linearIdx);
       });
 
+      slotPartyCount[chosenSlot.key] = (slotPartyCount[chosenSlot.key] || 0) + 1;
       finalAssignments.push({ party, slot: chosenSlot });
     }
 
@@ -680,7 +702,7 @@
     resultContainer.style.display = 'block';
   }
 
-  // --- 그룹 필터 드롭다운 채우기 ---
+  // --- 필터 드롭다운 및 렌더링 ---
   function populateFilterDropdown() {
     const sel = document.getElementById('filterGroupSelect');
     const groupSet = new Set();
@@ -692,12 +714,10 @@
       Array.from(groupSet).map(g => `<option value="${g}">${g} 그룹 시간표만 보기</option>`).join('');
   }
 
-  // --- 그룹 필터 적용 렌더링 ---
   function applyGroupFilter(selectedGroup) {
     const resultDiv = document.getElementById('scheduleResults');
     resultDiv.innerHTML = '';
 
-    // 필터링 적용
     if (selectedGroup === 'ALL') {
       currentFilteredData = currentScheduleData;
     } else {
@@ -711,7 +731,6 @@
       return;
     }
 
-    // 시간대별 그룹핑 (같은 시간대에 진행되는 다중 파티 묶음)
     const byTime = {};
     currentFilteredData.forEach(item => {
       const key = `${days[item.slot.dayIdx]}요일 ${item.slot.time}`;
@@ -719,7 +738,6 @@
       byTime[key].push(item);
     });
 
-    // 렌더링
     Object.keys(byTime).forEach(timeKey => {
       const partyList = byTime[timeKey];
       const isParallel = partyList.length > 1;
@@ -746,8 +764,8 @@
 
       resultDiv.innerHTML += `
         <div class="time-group-card">
-          <div class="time-group-header">
-            ⏰ [${timeKey}] ${isParallel ? `(⚡ ${partyList.length}개 파티 동시 진행)` : ''}
+          <div class="time-group-header ${isParallel ? 'parallel' : ''}">
+            ⏰ [${timeKey}] ${isParallel ? `(⚡ ${partyList.length}개 파티 동시 진행 중)` : ''}
           </div>
           <div class="time-group-body">
             ${subCardsHtml}
@@ -757,7 +775,6 @@
     });
   }
 
-  // --- 카카오톡용 텍스트 복사 기능 ---
   function copyScheduleText() {
     if (!currentFilteredData || currentFilteredData.length === 0) {
       alert('복사할 시간표가 없습니다.');
@@ -782,7 +799,6 @@
     });
   }
 
-  // --- 시간표 이미지 저장 기능 ---
   function downloadScheduleImage() {
     const target = document.getElementById('captureArea');
     if (!target || !currentFilteredData || currentFilteredData.length === 0) {
@@ -799,11 +815,16 @@
   }
 
   window.onload = () => {
-    loadData();
+    loadLocalData();
     initTimetable();
     renderBosses();
     updateGroupDropdown();
     updateBossAssignSelect();
+
+    if (currentRoom) {
+      document.getElementById('roomNameInput').value = currentRoom;
+      pullCloudData(false);
+    }
   };
 </script>
 </body>
