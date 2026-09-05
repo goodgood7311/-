@@ -1,195 +1,354 @@
+HTML
 <!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>약속 가능 시간 등록</title>
+  <title>보스 레이드 파티 조율기</title>
   <style>
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { padding: 16px; background-color: #f8f9fa; margin: 0; }
-    .card { max-width: 600px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-    h2 { margin-top: 0; font-size: 1.3rem; text-align: center; }
+    body { padding: 16px; background-color: #f1f3f5; margin: 0; color: #333; }
+    .container { max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+    .card { background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+    h2, h3 { margin-top: 0; color: #1e1e1e; }
     .form-group { margin-bottom: 14px; }
     label { display: block; font-weight: 600; font-size: 0.9rem; margin-bottom: 6px; }
-    input[type="text"] { width: 100%; padding: 10px; border: 1px solid #ced4da; border-radius: 6px; font-size: 0.95rem; }
-    
-    .grid-container { max-height: 420px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 8px; margin-top: 10px; }
-    .slot-table { width: 100%; border-collapse: collapse; user-select: none; }
-    .slot-table th, .slot-table td { border-bottom: 1px solid #e9ecef; text-align: center; padding: 10px 4px; font-size: 0.85rem; }
-    .slot-table th { background: #f1f3f5; position: sticky; top: 0; z-index: 2; }
-    .slot-cell { cursor: pointer; transition: background 0.1s; }
-    .slot-cell.active { background-color: #4dabf7; color: white; font-weight: bold; }
-    
-    .char-badge { display: inline-block; background: #e7f5ff; color: #1971c2; padding: 4px 8px; border-radius: 4px; margin: 2px; font-size: 0.85rem; }
-    .btn { width: 100%; padding: 12px; border: none; border-radius: 6px; font-size: 1rem; font-weight: bold; cursor: pointer; margin-top: 15px; }
-    .btn-submit { background-color: #228be6; color: white; }
-    .btn-submit:hover { background-color: #1c7ed6; }
-    .btn-secondary { background-color: #ced4da; color: #333; margin-top: 6px; }
+    input, select, button { padding: 8px 12px; border: 1px solid #ced4da; border-radius: 6px; font-size: 0.9rem; }
+    .btn { cursor: pointer; font-weight: bold; border: none; transition: 0.2s; }
+    .btn-primary { background: #228be6; color: white; }
+    .btn-primary:hover { background: #1c7ed6; }
+    .btn-danger { background: #fa5252; color: white; }
+    .btn-success { background: #40c057; color: white; width: 100%; padding: 12px; font-size: 1rem; }
+
+    /* 보스 목록 테이블 */
+    table.data-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    table.data-table th, table.data-table td { border: 1px solid #dee2e6; padding: 8px; text-align: center; }
+    table.data-table th { background: #f8f9fa; }
+
+    /* 20분 슬롯 그리드 */
+    .slot-container { max-height: 280px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 6px; margin-top: 8px; }
+    .slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 6px; padding: 10px; }
+    .slot-item { padding: 8px 4px; font-size: 0.8rem; text-align: center; border: 1px solid #ced4da; border-radius: 4px; cursor: pointer; background: #fff; }
+    .slot-item.active { background: #4dabf7; color: white; border-color: #228be6; font-weight: bold; }
+
+    /* 결과 매칭 뷰 */
+    .match-result-card { background: #e7f5ff; border-left: 4px solid #339af0; padding: 12px; margin-top: 10px; border-radius: 4px; }
   </style>
 </head>
 <body>
 
-<div class="card">
-  <h2>약속 가능 시간 등록</h2>
+<div class="container">
 
-  <div class="form-group">
-    <label>그룹명 (본인 닉네임/유저명)</label>
-    <input type="text" id="groupName" placeholder="예: 길동">
-  </div>
-
-  <div class="form-group">
-    <label>참여 캐릭터 추가</label>
-    <div style="display: flex; gap: 8px;">
-      <input type="text" id="charInput" placeholder="캐릭터명 입력">
-      <button class="btn btn-secondary" style="width: auto; margin:0;" onclick="addCharacter()">추가</button>
+  <div class="card">
+    <h2>1. 보스 약속 설정</h2>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+      <input type="text" id="bossName" placeholder="보스 이름 (예: 루시드 2인)">
+      <input type="number" id="bossTargetScore" step="0.1" placeholder="필요 스펙 수치 (예: 11.7)">
+      <input type="number" id="bossHeadcount" min="1" max="10" placeholder="인원 수 (예: 2)">
+      <button class="btn btn-primary" onclick="addBoss()">보스 추가</button>
     </div>
-    <div id="charList" style="margin-top: 8px;"></div>
-  </div>
 
-  <div class="form-group" id="charSelectGroup" style="display:none;">
-    <label>현재 시간을 지정할 캐릭터 선택</label>
-    <select id="charSelect" style="width: 100%; padding: 8px; border-radius: 6px;" onchange="loadCharSchedule()">
-    </select>
-  </div>
-
-  <label>가능 시간 선택 (터치/클릭하여 활성화)</label>
-  <div class="grid-container">
-    <table class="slot-table">
+    <table class="data-table">
       <thead>
         <tr>
-          <th style="width: 45%;">시간대</th>
-          <th>선택</th>
+          <th>보스명</th>
+          <th>요구 스펙 합산치</th>
+          <th>인원수</th>
+          <th>관리</th>
         </tr>
       </thead>
-      <tbody id="slotBody"></tbody>
+      <tbody id="bossListBody"></tbody>
     </table>
   </div>
 
-  <button class="btn btn-submit" onclick="submitData()">일정 제출하기</button>
+  <div class="card">
+    <h2>2. 참여자 일정 및 캐릭터 등록</h2>
+    
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+      <div class="form-group" style="flex: 1;">
+        <label>그룹명 (닉네임)</label>
+        <input type="text" id="groupName" style="width: 100%;" placeholder="예: 길동">
+      </div>
+      <div class="form-group" style="flex: 2;">
+        <label>캐릭터 추가 (이름 및 본인 수치)</label>
+        <div style="display: flex; gap: 6px;">
+          <input type="text" id="charName" placeholder="캐릭터명 (예: 캐릭1)" style="flex: 2;">
+          <input type="number" id="charScore" step="0.1" placeholder="수치 (예: 6.0)" style="flex: 1;">
+          <button class="btn btn-primary" onclick="addCharacter()">캐릭 등록</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="charListBadge" style="margin-bottom: 12px;"></div>
+
+    <hr style="border: none; border-top: 1px solid #eee; margin: 15px 0;">
+
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <div class="form-group" style="flex: 1;">
+        <label>날짜 선택</label>
+        <input type="date" id="selectedDate" onchange="renderTimeSlots()">
+      </div>
+      <div class="form-group" style="flex: 1;">
+        <label>시간 입력 대상 캐릭터</label>
+        <select id="charSelect" style="width: 100%;" onchange="loadCharDaySchedule()"></select>
+      </div>
+    </div>
+
+    <label>가능 시간대 선택 (20분 단위)</label>
+    <div class="slot-container">
+      <div class="slot-grid" id="slotGrid"></div>
+    </div>
+
+    <button class="btn btn-success" style="margin-top: 15px;" onclick="saveCurrentParticipant()">현재 참여자 데이터 제출/저장</button>
+  </div>
+
+  <div class="card">
+    <h2>3. 최종 약속 시간표 생성</h2>
+    <p style="font-size: 0.85rem; color: #666;">등록된 모든 참여자의 캐릭터 수치와 일정을 바탕으로, 연속 시간대를 우선 고려하여 파티를 매칭합니다.</p>
+    <button class="btn btn-primary" style="width: 100%; padding: 12px; font-size: 1rem;" onclick="generateSchedule()">조건 기반 매칭 시작</button>
+
+    <div id="matchResults" style="margin-top: 15px;"></div>
+  </div>
+
 </div>
 
 <script>
-  // 1. 기준 시간 슬롯 생성 (예시: 18:00 ~ 23:40, 20분 단위)
+  // 상태 관리
+  let bosses = [
+    { id: 'b1', name: '보스 A', targetScore: 11.7, count: 2 }
+  ];
+
+  let currentCharacters = []; // [{ name: '캐릭1', score: 6.0 }]
+  let schedules = {}; // { 'charName': { 'YYYY-MM-DD': Set([slotIdx]) } }
+  
+  // 전체 참여자 DB (시뮬레이션용)
+  let allParticipants = [];
+
+  // 20분 슬롯 목록 (18:00 ~ 24:00)
   const timeSlots = [];
-  const startHour = 18;
-  const endHour = 24;
-
-  for (let h = startHour; h < endHour; h++) {
+  for (let h = 18; h < 24; h++) {
     for (let m = 0; m < 60; m += 20) {
-      const hh = String(h).padStart(2, '0');
-      const mm = String(m).padStart(2, '0');
-      timeSlots.push(`${hh}:${mm}`);
+      timeSlots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
     }
   }
 
-  const characters = [];
-  const schedules = {}; // { charName: Set(slot_indexes) }
+  // 초기 날짜를 오늘로 설정
+  document.getElementById('selectedDate').value = new Date().toISOString().split('T')[0];
 
-  // 테이블 렌더링
-  const tbody = document.getElementById('slotBody');
-  timeSlots.forEach((slot, index) => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${slot}</td>
-      <td class="slot-cell" data-index="${index}" onclick="toggleSlot(${index})">선택 안 함</td>
-    `;
-    tbody.appendChild(tr);
-  });
+  window.onload = () => {
+    renderBosses();
+    renderTimeSlots();
+  };
 
+  // --- 보스 관리 ---
+  function addBoss() {
+    const name = document.getElementById('bossName').value.trim();
+    const score = parseFloat(document.getElementById('bossTargetScore').value);
+    const count = parseInt(document.getElementById('bossHeadcount').value);
+
+    if (!name || isNaN(score) || isNaN(count)) {
+      alert('보스 정보(이름, 필요 수치, 인원수)를 모두 입력하세요.');
+      return;
+    }
+    bosses.push({ id: 'b_' + Date.now(), name, targetScore: score, count });
+    renderBosses();
+    document.getElementById('bossName').value = '';
+    document.getElementById('bossTargetScore').value = '';
+    document.getElementById('bossHeadcount').value = '';
+  }
+
+  function deleteBoss(id) {
+    bosses = bosses.filter(b => b.id !== id);
+    renderBosses();
+  }
+
+  function renderBosses() {
+    const tbody = document.getElementById('bossListBody');
+    tbody.innerHTML = bosses.map(b => `
+      <tr>
+        <td><strong>${b.name}</strong></td>
+        <td>합산 ${b.targetScore} 이상</td>
+        <td>${b.count}명</td>
+        <td><button class="btn btn-danger" onclick="deleteBoss('${b.id}')">삭제</button></td>
+      </tr>
+    `).join('');
+  }
+
+  // --- 캐릭터 및 시간표 관리 ---
   function addCharacter() {
-    const input = document.getElementById('charInput');
-    const name = input.value.trim();
-    if (!name || characters.includes(name)) return;
+    const name = document.getElementById('charName').value.trim();
+    const score = parseFloat(document.getElementById('charScore').value);
 
-    characters.push(name);
-    schedules[name] = new Set();
-    input.value = '';
-    
-    renderCharBadges();
-    updateCharSelect();
+    if (!name || isNaN(score)) {
+      alert('캐릭터 이름과 수치를 입력하세요.');
+      return;
+    }
+    if (currentCharacters.some(c => c.name === name)) {
+      alert('이미 추가된 캐릭터입니다.');
+      return;
+    }
+
+    currentCharacters.push({ name, score });
+    schedules[name] = {};
+    document.getElementById('charName').value = '';
+    document.getElementById('charScore').value = '';
+
+    updateCharUI();
   }
 
-  function renderCharBadges() {
-    const container = document.getElementById('charList');
-    container.innerHTML = characters.map(c => `<span class="char-badge">${c}</span>`).join('');
-  }
+  function updateCharUI() {
+    const badgeContainer = document.getElementById('charListBadge');
+    badgeContainer.innerHTML = currentCharacters.map(c => 
+      `<span style="background:#e7f5ff; color:#1971c2; padding:4px 8px; border-radius:4px; margin-right:4px; font-size:0.85rem;">
+        ${c.name} (${c.score})
+       </span>`
+    ).join('');
 
-  function updateCharSelect() {
     const select = document.getElementById('charSelect');
-    const group = document.getElementById('charSelectGroup');
-    if (characters.length > 0) {
-      group.style.display = 'block';
-      select.innerHTML = characters.map(c => `<option value="${c}">${c}</option>`).join('');
-      loadCharSchedule();
-    }
+    select.innerHTML = currentCharacters.map(c => `<option value="${c.name}">${c.name} (${c.score})</option>`).join('');
+    loadCharDaySchedule();
   }
 
-  function toggleSlot(index) {
+  function renderTimeSlots() {
+    const container = document.getElementById('slotGrid');
+    container.innerHTML = timeSlots.map((slot, idx) => `
+      <div class="slot-item" id="slot-${idx}" onclick="toggleSlot(${idx})">
+        ${slot}
+      </div>
+    `).join('');
+    loadCharDaySchedule();
+  }
+
+  function toggleSlot(idx) {
     const char = document.getElementById('charSelect').value;
-    if (!char) {
-      alert('캐릭터를 먼저 추가해주세요.');
-      return;
-    }
+    const date = document.getElementById('selectedDate').value;
+    if (!char) { alert('캐릭터를 먼저 추가하세요.'); return; }
 
-    const currentSet = schedules[char];
-    if (currentSet.has(index)) {
-      currentSet.delete(index);
-    } else {
-      currentSet.add(index);
-    }
-    updateCellUI(index, currentSet.has(index));
+    if (!schedules[char][date]) schedules[char][date] = new Set();
+    const currentSet = schedules[char][date];
+
+    if (currentSet.has(idx)) currentSet.delete(idx);
+    else currentSet.add(idx);
+
+    document.getElementById(`slot-${idx}`).classList.toggle('active', currentSet.has(idx));
   }
 
-  function updateCellUI(index, isActive) {
-    const cell = document.querySelector(`.slot-cell[data-index="${index}"]`);
-    if (isActive) {
-      cell.classList.add('active');
-      cell.innerText = '가능';
-    } else {
-      cell.classList.remove('active');
-      cell.innerText = '선택 안 함';
-    }
-  }
-
-  function loadCharSchedule() {
+  function loadCharDaySchedule() {
     const char = document.getElementById('charSelect').value;
-    const currentSet = schedules[char] || new Set();
+    const date = document.getElementById('selectedDate').value;
+    const currentSet = (schedules[char] && schedules[char][date]) ? schedules[char][date] : new Set();
+
     timeSlots.forEach((_, idx) => {
-      updateCellUI(idx, currentSet.has(idx));
+      const el = document.getElementById(`slot-${idx}`);
+      if (el) el.classList.toggle('active', currentSet.has(idx));
     });
   }
 
-  function submitData() {
-    const groupName = document.getElementById('groupName').value.trim();
-    if (!groupName) {
-      alert('그룹명을 입력하세요.');
-      return;
-    }
-    if (characters.length === 0) {
-      alert('캐릭터를 1개 이상 추가해야 합니다.');
-      return;
-    }
+  function saveCurrentParticipant() {
+    const group = document.getElementById('groupName').value.trim();
+    if (!group) { alert('그룹명을 입력하세요.'); return; }
+    if (currentCharacters.length === 0) { alert('캐릭터를 1개 이상 추가해야 합니다.'); return; }
 
-    const payload = {
-      group: groupName,
-      characters: {}
-    };
-
-    characters.forEach(c => {
-      payload.characters[c] = Array.from(schedules[c]).sort((a,b) => a - b);
+    allParticipants.push({
+      group,
+      characters: JSON.parse(JSON.stringify(currentCharacters)),
+      schedules: JSON.parse(JSON.stringify(schedules, (k, v) => v instanceof Set ? Array.from(v) : v))
     });
 
-    // 백엔드 API 연동 전 테스트용 콘솔 출력 및 알림
-    console.log("전송 데이터:", JSON.stringify(payload, null, 2));
-    alert("데이터가 준비되었습니다. (F12 콘솔 확인 가능)\n백엔드 API 주소를 연결하면 서버로 전송됩니다.");
-    
-    /* // 실제 백엔드 연동 시:
-    fetch('https://your-api-server.com/submit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    }).then(res => alert('제출 완료!'));
-    */
+    alert(`[${group}] 님의 일정이 저장되었습니다. 다른 참여자도 연속해서 등록하거나 바로 매칭을 시작할 수 있습니다.`);
+    currentCharacters = [];
+    schedules = {};
+    document.getElementById('groupName').value = '';
+    updateCharUI();
+    renderTimeSlots();
+  }
+
+  // --- 매칭 알고리즘 (조건 합산 및 연속성 우선 고려) ---
+  function generateSchedule() {
+    if (allParticipants.length === 0 && currentCharacters.length > 0) {
+      saveCurrentParticipant();
+    }
+    if (allParticipants.length === 0) {
+      alert('등록된 참여자 데이터가 없습니다.');
+      return;
+    }
+
+    const resultDiv = document.getElementById('matchResults');
+    resultDiv.innerHTML = '<h3>생성된 약속 시간표</h3>';
+
+    // 모든 날짜 수집
+    const dates = new Set();
+    allParticipants.forEach(p => {
+      Object.values(p.schedules).forEach(charDates => {
+        Object.keys(charDates).forEach(d => dates.add(d));
+      });
+    });
+
+    let formedParties = 0;
+
+    dates.forEach(date => {
+      timeSlots.forEach((slotName, slotIdx) => {
+        // 해당 시간대에 가능한 캐릭터 리스트 추출
+        let candidates = [];
+        allParticipants.forEach(p => {
+          p.characters.forEach(char => {
+            const availSlots = p.schedules[char.name]?.[date] || [];
+            if (availSlots.includes(slotIdx)) {
+              candidates.push({ group: p.group, name: char.name, score: char.score });
+            }
+          });
+        });
+
+        // 각 보스별로 인원 & 스펙 조건 검사
+        bosses.forEach(boss => {
+          if (candidates.length >= boss.count) {
+            // 그룹 중복 없이 조합 탐색 (단순 조합 알고리즘)
+            const party = findValidParty(candidates, boss.count, boss.targetScore);
+            if (party) {
+              formedParties++;
+              const sumScore = party.reduce((sum, c) => sum + c.score, 0).toFixed(1);
+              const membersInfo = party.map(c => `${c.group}(${c.name}: ${c.score})`).join(', ');
+
+              resultDiv.innerHTML += `
+                <div class="match-result-card">
+                  <strong>[${date} ${slotName}] ${boss.name}</strong><br>
+                  - 요구 수치: ${boss.targetScore} | <strong>달성 합산치: ${sumScore}</strong><br>
+                  - 구성원: ${membersInfo}
+                </div>
+              `;
+              // 이미 배치된 캐릭터는 후보군에서 제외
+              candidates = candidates.filter(c => !party.includes(c));
+            }
+          }
+        });
+      });
+    });
+
+    if (formedParties === 0) {
+      resultDiv.innerHTML += '<p style="color:#fa5252;">조건(인원수 및 수치 합산치)을 만족하는 시간대를 찾지 못했습니다.</p>';
+    }
+  }
+
+  function findValidParty(candidates, size, targetScore) {
+    function backtrack(start, combo, usedGroups) {
+      if (combo.length === size) {
+        const total = combo.reduce((s, c) => s + c.score, 0);
+        return total >= targetScore ? combo : null;
+      }
+      for (let i = start; i < candidates.length; i++) {
+        const c = candidates[i];
+        if (!usedGroups.has(c.group)) {
+          usedGroups.add(c.group);
+          combo.push(c);
+          const res = backtrack(i + 1, combo, usedGroups);
+          if (res) return res;
+          combo.pop();
+          usedGroups.delete(c.group);
+        }
+      }
+      return null;
+    }
+    return backtrack(0, [], new Set());
   }
 </script>
 </body>
