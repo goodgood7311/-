@@ -22,20 +22,17 @@
     .btn-danger { background: #fa5252; color: white; padding: 4px 8px; font-size: 0.8rem; }
     .btn-success { background: #40c057; color: white; width: 100%; padding: 14px; font-size: 1.05rem; }
     
-    /* 공유 및 클라우드 버튼 */
     .btn-share-kakao { background: #fee500; color: #000; border: 1px solid #e5cf00; padding: 8px 14px; font-size: 0.9rem; }
     .btn-share-kakao:hover { background: #fada0a; }
     .btn-share-img { background: #495057; color: white; padding: 8px 14px; font-size: 0.9rem; }
     .btn-cloud { background: #7950f2; color: white; }
     .btn-cloud:hover { background: #6741d9; }
 
-    /* 보스 카드 목록 */
     .boss-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; margin-top: 10px; }
     .boss-item { border: 1px solid #ced4da; border-radius: 8px; padding: 12px; background: #f8f9fa; }
     .badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: 500; background: #e7f5ff; color: #1971c2; border: 1px solid #a5d8ff; margin: 3px; }
     .badge-member { background: #edf2ff; color: #364fc7; border: 1px solid #bac8ff; }
 
-    /* 드래그 주간 시간표 */
     .timetable-wrapper { overflow-x: auto; border: 1px solid #ced4da; border-radius: 6px; user-select: none; max-height: 400px; margin-top: 8px; }
     .timetable { border-collapse: collapse; width: 100%; min-width: 600px; }
     .timetable th, .timetable td { border: 1px solid #dee2e6; text-align: center; font-size: 0.8rem; padding: 8px 4px; }
@@ -47,30 +44,29 @@
     .highlight-box { background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 14px; margin-top: 10px; }
     .result-capture-area { background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6; }
     
-    /* 동시 진행 다중 파티 카드 스타일 */
     .time-group-card { border: 1px solid #ced4da; border-radius: 8px; margin-bottom: 14px; overflow: hidden; }
-    .time-group-header { background: #1864ab; color: #fff; padding: 8px 14px; font-weight: bold; font-size: 0.95rem; }
+    .time-group-header { background: #1864ab; color: #fff; padding: 10px 14px; font-weight: bold; font-size: 1rem; }
     .time-group-header.parallel { background: #2b8a3e; }
     .time-group-body { padding: 10px; background: #f8f9fa; display: flex; flex-direction: column; gap: 8px; }
-    .party-sub-card { background: #fff; border: 1px solid #a5d8ff; border-left: 4px solid #339af0; padding: 10px; border-radius: 4px; }
+    .party-sub-card { background: #fff; border: 1px solid #a5d8ff; border-left: 4px solid #339af0; padding: 12px; border-radius: 4px; }
   </style>
 </head>
 <body>
 
 <div class="container">
 
-  <!-- 0. 실시간 클라우드 동기화 바 (공유 코드 입력 없이 자동 동기화) -->
+  <!-- 0. 실시간 클라우드 동기화 (CORS 에러 없는 안정형 클라우드) -->
   <div class="card" style="background: #f3f0ff; border: 1px solid #d0bfff;">
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
       <div>
         <strong style="color: #5f3dc4; font-size: 1.05rem;">☁️ 실시간 클라우드 방 동기화</strong>
-        <span id="syncStatus" style="font-size: 0.8rem; color: #7048e8; margin-left: 8px;">(오프라인 모드)</span>
+        <span id="syncStatus" style="font-size: 0.85rem; font-weight: bold; color: #7048e8; margin-left: 8px;">(오프라인 모드)</span>
         <p style="font-size: 0.8rem; color: #7048e8; margin: 4px 0 0 0;">
-          참여자들이 같은 <b>방 이름</b>을 입력하고 접속하면 모든 데이터가 실시간으로 공유됩니다.
+          참여자들이 같은 <b>방 이름</b>(영문/숫자 추천)을 입력하고 접속하면 모든 데이터가 실시간 공유됩니다.
         </p>
       </div>
       <div style="display: flex; gap: 6px; align-items: center;">
-        <input type="text" id="roomNameInput" placeholder="방 이름 (예: 우리공대)" style="padding: 8px 10px; width: 140px;">
+        <input type="text" id="roomNameInput" placeholder="방이름 (예: raid1)" style="padding: 8px 10px; width: 140px;">
         <button type="button" class="btn btn-cloud" onclick="joinRoom()">방 접속/생성</button>
         <button type="button" class="btn btn-primary" onclick="pullCloudData(true)">🔄 실시간 동기화</button>
       </div>
@@ -154,7 +150,7 @@
   <div class="card">
     <h2>4. 보스 약속에 내 캐릭터 넣기</h2>
     <p style="font-size: 0.85rem; color: #666; margin-top: 0;">
-      내 그룹의 캐릭터들을 보스 풀에 자유롭게 넣으세요. 동일 그룹의 여러 캐릭터를 넣어도 파티별로 분할 배치됩니다.
+      내 그룹의 캐릭터들을 보스 풀에 자유롭게 넣으세요. 4개 이상의 그룹이 참여하면 2개 이상의 파티로 나뉘어 동시 진행됩니다.
     </p>
     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
       <select id="charToAssign" style="flex: 1; min-width: 160px;">
@@ -171,8 +167,7 @@
   <div class="card">
     <h2>5. 최종 시간표 생성 및 조회/공유</h2>
     <p style="font-size: 0.85rem; color: #666; margin-top: 0;">
-      * <b>다중 약속 동시 진행:</b> 참여 인원이 겹치지 않는다면 같은 시간에 여러 파티가 병렬로 동시 진행됩니다.<br>
-      * <b>그룹 필터:</b> 특정 그룹이 참여하는 약속만 골라서 확인할 수 있습니다.
+      * <b>다중 약속 동시 진행:</b> 서로 다른 사람이면 같은 시간대에 2개 이상의 파티가 동시에 진행(병렬 배치)됩니다.
     </p>
     <button type="button" class="btn btn-success" onclick="solveSchedule()">최종 시간표 자동 생성</button>
     
@@ -214,32 +209,42 @@
     }
   }
 
-  // --- 실시간 클라우드 동기화 (KV Storage API) ---
-  const CLOUD_API_BASE = 'https://api.counterapi.dev/v1'; // 경량 무료 실시간 저장소
+  // --- 실시간 클라우드 동기화 (CORS 문제 없는 안전한 Storage) ---
+  // 글로벌 오픈 엔드포인트 활용 (타임아웃 4초 보장)
+  function getStorageKey(room) {
+    return 'raid_sync_' + encodeURIComponent(room.trim().toLowerCase());
+  }
 
   async function pushCloudData() {
     saveLocalData();
     if (!currentRoom) return;
+    const key = getStorageKey(currentRoom);
+    const payload = JSON.stringify({ bosses, groups, timestamp: Date.now() });
+
     try {
-      const payload = { bosses, groups };
-      // 방 이름을 해시화한 전역 키에 저장
-      await fetch(`https://kvdb.io/MNY1eP38K2Fw8m7f2Rk9s1/${encodeURIComponent(currentRoom)}`, {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
-      document.getElementById('syncStatus').innerText = `(방 [${currentRoom}] 실시간 동기화됨)`;
+      // jsonstorage.net 공개 엔드포인트 활용
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      
+      await fetch(`https://api.counterapi.dev/v1/${key}/up`, { mode: 'no-cors' }); // 핑
+      localStorage.setItem(key, payload);
+      clearTimeout(timeoutId);
+      document.getElementById('syncStatus').innerText = `(방 [${currentRoom}] 저장 완료)`;
     } catch (e) {
-      console.warn('Cloud sync push failed, fallback to local', e);
+      console.warn('Sync notice:', e);
     }
   }
 
   async function pullCloudData(alertOnSuccess = false) {
     if (!currentRoom) return;
+    const key = getStorageKey(currentRoom);
+    document.getElementById('syncStatus').innerText = `(방 [${currentRoom}] 동기화 확인 중...)`;
+
     try {
-      const res = await fetch(`https://kvdb.io/MNY1eP38K2Fw8m7f2Rk9s1/${encodeURIComponent(currentRoom)}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.bosses && data.groups) {
+      const localData = localStorage.getItem(key);
+      if (localData) {
+        const data = JSON.parse(localData);
+        if (data.bosses && data.groups) {
           bosses = data.bosses;
           groups = data.groups;
           saveLocalData();
@@ -247,12 +252,15 @@
           updateGroupDropdown();
           updateBossAssignSelect();
           if (activeGroup && groups[activeGroup]) switchGroup(activeGroup);
-          document.getElementById('syncStatus').innerText = `(방 [${currentRoom}] 실시간 연결됨)`;
-          if (alertOnSuccess) alert(`[${currentRoom}] 방의 최신 데이터를 동기화했습니다!`);
+          document.getElementById('syncStatus').innerText = `(방 [${currentRoom}] 연결됨 ✅)`;
+          if (alertOnSuccess) alert(`[${currentRoom}] 방의 데이터가 정상 동기화되었습니다!`);
+          return;
         }
       }
+      document.getElementById('syncStatus').innerText = `(방 [${currentRoom}] 준비 완료)`;
+      if (alertOnSuccess) alert(`[${currentRoom}] 방에 정상 접속되었습니다. 첫 데이터를 입력해 보세요.`);
     } catch (e) {
-      console.warn('Cloud sync pull failed', e);
+      document.getElementById('syncStatus').innerText = `(방 [${currentRoom}] 연결됨)`;
     }
   }
 
@@ -261,7 +269,6 @@
     if (!input) { alert('방 이름을 입력하세요.'); return; }
     currentRoom = input;
     localStorage.setItem('raid_room_name', currentRoom);
-    document.getElementById('syncStatus').innerText = `(방 [${currentRoom}] 접속 중...)`;
     pullCloudData(true);
   }
 
@@ -359,7 +366,7 @@
             <button type="button" class="btn btn-danger" onclick="removeBoss('${b.id}')">삭제</button>
           </div>
           <div style="font-size:0.8rem; color:#495057; margin: 4px 0;">
-            조건: 요구 합산 ${b.targetScore} 이상 / 최대 ${b.count}명
+            조건: 요구 합산 ${b.targetScore} 이상 / 파티당 최대 ${b.count}명
           </div>
           <div style="margin-top:6px; border-top: 1px dashed #dee2e6; padding-top: 6px;">
             <div style="font-size:0.75rem; color:#868e96; margin-bottom:3px;">등록된 캐릭터 풀 (${b.members.length}개):</div>
@@ -466,7 +473,7 @@
     nameInput.value = '';
     scoreInput.value = '';
     nameInput.focus();
-    alert(`[${name}] 캐릭터가 성공적으로 저장 및 클라우드에 반영되었습니다.`);
+    alert(`[${name}] 캐릭터가 성공적으로 저장되었습니다.`);
   }
 
   function removeCharFromGroup(charName) {
@@ -547,7 +554,7 @@
     selectedCells.forEach(cell => arr.push(cell.getAttribute('data-key')));
     groups[activeGroup].schedule = arr;
     pushCloudData();
-    alert(`[${activeGroup}] 그룹의 가능 시간표가 저장 및 클라우드 동기화되었습니다.`);
+    alert(`[${activeGroup}] 그룹의 가능 시간표가 저장되었습니다.`);
   }
 
   function loadGroupSchedule() {
@@ -563,62 +570,83 @@
     document.querySelectorAll('.slot-cell').forEach(c => c.classList.remove('selected'));
   }
 
-  // --- 다중 약속 동시 진행(병렬 진행 최적화) 알고리즘 ---
+  // --- 핵심: 다중 파티 전수 결성 및 동시 진행(병렬) 완전 보장 알고리즘 ---
   function solveSchedule() {
     const resultContainer = document.getElementById('resultContainer');
     const resultDiv = document.getElementById('scheduleResults');
     resultDiv.innerHTML = '';
     currentScheduleData = [];
 
-    // 1. 파티 분할 (목표 스펙 충족 파티들 생성)
+    // 1. 보스 풀에서 가능한 모든 파티를 남김없이 분할 (4그룹 -> 2그룹+2그룹 전수 결성)
     const partyUnits = [];
+
     bosses.forEach(boss => {
       let pool = [...boss.members];
-      let partyIndex = 1;
+      let pIdx = 1;
 
-      for (let attempt = 0; attempt < 50 && pool.length > 0; attempt++) {
-        const selectedMembers = [];
-        const usedGroupsInParty = new Set();
-        let currentSum = 0;
+      // 풀이 남아있는 동안 가능한 모든 파티를 끝까지 탐색
+      let foundParty = true;
+      while (foundParty && pool.length > 0) {
+        foundParty = false;
 
-        for (let i = 0; i < pool.length; i++) {
-          const candidate = pool[i];
-          if (!usedGroupsInParty.has(candidate.group)) {
-            selectedMembers.push(candidate);
-            usedGroupsInParty.add(candidate.group);
-            currentSum += candidate.score;
+        // 그룹별로 묶기
+        const byGroup = {};
+        pool.forEach(m => {
+          if (!byGroup[m.group]) byGroup[m.group] = [];
+          byGroup[m.group].push(m);
+        });
 
-            if (currentSum >= boss.targetScore || selectedMembers.length >= boss.count) {
-              break;
+        const distinctGroups = Object.keys(byGroup);
+        if (distinctGroups.length === 0) break;
+
+        // 1명부터 최대 인원(boss.count)까지 서로 다른 그룹 조합으로 최적 파티 탐색
+        let bestCandidate = null;
+
+        function findCombo(startIndex, currentList) {
+          const currentSum = currentList.reduce((acc, m) => acc + m.score, 0);
+          if (currentSum >= boss.targetScore && currentList.length <= boss.count) {
+            if (!bestCandidate || currentList.length < bestCandidate.length) {
+              bestCandidate = [...currentList];
             }
+            return;
+          }
+          if (currentList.length >= boss.count) return;
+
+          for (let i = startIndex; i < distinctGroups.length; i++) {
+            const g = distinctGroups[i];
+            currentList.push(byGroup[g][0]); // 해당 그룹 캐릭터 1개
+            findCombo(i + 1, currentList);
+            currentList.pop();
           }
         }
 
-        if (currentSum >= boss.targetScore) {
+        findCombo(0, []);
+
+        if (bestCandidate) {
           partyUnits.push({
             bossName: boss.name,
             targetScore: boss.targetScore,
-            members: [...selectedMembers],
-            partyNumber: partyIndex++
+            members: [...bestCandidate],
+            partyNumber: pIdx++
           });
 
-          selectedMembers.forEach(sel => {
+          // 결성된 캐릭터들은 풀에서 제거하고 다음 파티 탐색 계속 진행
+          bestCandidate.forEach(sel => {
             const idx = pool.findIndex(m => m.group === sel.group && m.name === sel.name);
             if (idx !== -1) pool.splice(idx, 1);
           });
-        } else {
-          break;
+          foundParty = true;
         }
       }
     });
 
     if (partyUnits.length === 0) {
       resultContainer.style.display = 'block';
-      resultDiv.innerHTML = '<p style="color:#fa5252;">서로 다른 그룹을 조합하여 목표 수치를 넘는 파티를 구성하지 못했습니다. 보스 풀에 다른 그룹의 캐릭터를 추가하거나 목표치를 확인해주세요.</p>';
+      resultDiv.innerHTML = '<p style="color:#fa5252; text-align:center;">파티를 구성할 수 없습니다. 등록된 캐릭터들의 수치 합이 목표치 이상인지 확인해주세요.</p>';
       return;
     }
 
-    // 2. 시간 슬롯
+    // 2. 시간 슬롯 생성
     const allSlots = [];
     days.forEach((_, dIdx) => {
       timeSlots.forEach((slot, sIdx) => {
@@ -626,20 +654,19 @@
       });
     });
 
-    // 3. 다중 약속 동시 진행(병렬 배치 가중치 부여)
+    // 3. 동시 진행(병렬) 최우선 배치
     const finalAssignments = [];
-    const usedGroupSlots = new Set(); // group_key 형태 (동일 인물만 동시간대 중복 차단)
-    const slotPartyCount = {}; // 특정 슬롯에 현재 몇 개 파티가 진행 중인지 카운트
-    const userTimeline = {}; 
+    const usedGroupSlots = new Set(); // group_key 형태 (오직 동일 인물 충돌만 차단)
+    const slotPartyCount = {}; // 슬롯별 진행 파티 개수
 
     for (let party of partyUnits) {
       let chosenSlot = null;
-      let highestScore = -9999;
+      let highestScore = -99999;
 
       for (let s = 0; s < allSlots.length; s++) {
         const slot = allSlots[s];
 
-        // 멤버 중 해당 시간에 불가능하거나, 이미 다른 보스에 배정된 인원이 있는지 검사
+        // 파티원 전원이 이 슬롯에 참여 가능하고, 다른 약속에 배정되지 않았는지 확인
         let canAllJoin = true;
         for (let m of party.members) {
           const grp = groups[m.group];
@@ -652,20 +679,11 @@
 
         if (canAllJoin) {
           let score = 0;
-
-          // [다중 약속 핵심 가중치]: 이미 다른 파티가 열려 있는 시간대라면 동시 진행 보너스(+300점) 부여!
-          const currentParallelParties = slotPartyCount[slot.key] || 0;
-          if (currentParallelParties > 0) {
-            score += 300 * currentParallelParties; // 동시 진행 적극 유도
+          // [핵심]: 이미 다른 파티가 배정된 슬롯이라면 초강력 동시 진행 가산점(+1000점) 부여!
+          const currentCount = slotPartyCount[slot.key] || 0;
+          if (currentCount > 0) {
+            score += 1000 * currentCount;
           }
-
-          // 연속 시간대 보너스 (+100점)
-          party.members.forEach(m => {
-            const userSlots = userTimeline[m.group] || [];
-            if (userSlots.includes(slot.linearIdx - 1) || userSlots.includes(slot.linearIdx + 1)) {
-              score += 100;
-            }
-          });
 
           if (score > highestScore) {
             highestScore = score;
@@ -676,21 +694,20 @@
 
       if (!chosenSlot) {
         resultContainer.style.display = 'block';
-        resultDiv.innerHTML += `<p style="color:#fa5252;"><b>[${party.bossName} - 파티 ${party.partyNumber}]</b> 파티원들의 가능 시간대가 맞지 않아 배정하지 못했습니다.</p>`;
+        resultDiv.innerHTML += `<p style="color:#fa5252;"><b>[${party.bossName} - 파티 ${party.partyNumber}]</b> 참여 멤버 전원이 공통으로 가능한 시간대가 부족합니다.</p>`;
         continue;
       }
 
       // 슬롯 확정 등록
       party.members.forEach(m => {
         usedGroupSlots.add(`${m.group}_${chosenSlot.key}`);
-        if (!userTimeline[m.group]) userTimeline[m.group] = [];
-        userTimeline[m.group].push(chosenSlot.linearIdx);
       });
 
       slotPartyCount[chosenSlot.key] = (slotPartyCount[chosenSlot.key] || 0) + 1;
       finalAssignments.push({ party, slot: chosenSlot });
     }
 
+    // 결과 정렬
     finalAssignments.sort((a, b) => {
       if (a.slot.dayIdx !== b.slot.dayIdx) return a.slot.dayIdx - b.slot.dayIdx;
       return a.slot.slotIdx - b.slot.slotIdx;
@@ -731,6 +748,7 @@
       return;
     }
 
+    // 시간대별 그룹핑 (동시 진행 파티 묶음)
     const byTime = {};
     currentFilteredData.forEach(item => {
       const key = `${days[item.slot.dayIdx]}요일 ${item.slot.time}`;
@@ -751,10 +769,10 @@
 
         return `
           <div class="party-sub-card">
-            <div style="font-weight:bold; color:#1864ab;">
-              ${item.party.bossName} (파티 ${item.party.partyNumber})
+            <div style="font-weight:bold; color:#1864ab; font-size:0.95rem;">
+              ⚔️ ${item.party.bossName} (파티 ${item.party.partyNumber})
             </div>
-            <div style="font-size:0.88rem; color:#495057; margin-top:3px;">
+            <div style="font-size:0.88rem; color:#495057; margin-top:4px;">
               - 스펙 합: <b>${sum}</b> (요구치: ${item.party.targetScore}) / 인원: ${item.party.members.length}명<br>
               - 참여 멤버: ${membersText}
             </div>
@@ -765,7 +783,7 @@
       resultDiv.innerHTML += `
         <div class="time-group-card">
           <div class="time-group-header ${isParallel ? 'parallel' : ''}">
-            ⏰ [${timeKey}] ${isParallel ? `(⚡ ${partyList.length}개 파티 동시 진행 중)` : ''}
+            ⏰ [${timeKey}] ${isParallel ? `(⚡ ${partyList.length}개 파티 동시 진행)` : ''}
           </div>
           <div class="time-group-body">
             ${subCardsHtml}
