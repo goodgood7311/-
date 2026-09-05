@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>주간 레이드 시간표 자동 조율기</title>
+  <!-- 이미지 캡처/저장을 위한 경량 라이브러리 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { padding: 16px; background-color: #f1f3f5; margin: 0; color: #212529; }
@@ -20,6 +22,12 @@
     .btn-save-char:hover { background: #f76707; }
     .btn-danger { background: #fa5252; color: white; padding: 4px 8px; font-size: 0.8rem; }
     .btn-success { background: #40c057; color: white; width: 100%; padding: 14px; font-size: 1.05rem; }
+    
+    /* 공유 버튼 스타일 */
+    .btn-share-kakao { background: #fee500; color: #000; border: 1px solid #e5cf00; padding: 8px 14px; font-size: 0.9rem; }
+    .btn-share-kakao:hover { background: #fada0a; }
+    .btn-share-img { background: #495057; color: white; padding: 8px 14px; font-size: 0.9rem; }
+    .btn-share-img:hover { background: #343a40; }
 
     /* 보스 카드 목록 */
     .boss-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; margin-top: 10px; }
@@ -37,6 +45,7 @@
     .slot-cell.selected { background-color: #339af0 !important; }
 
     .highlight-box { background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 14px; margin-top: 10px; }
+    .result-capture-area { background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6; }
     .result-box { background: #e7f5ff; border: 1px solid #74c0fc; border-radius: 6px; padding: 12px; margin-bottom: 10px; }
   </style>
 </head>
@@ -134,14 +143,29 @@
     </div>
   </div>
 
-  <!-- 5. 최종 시간표 생성 -->
+  <!-- 5. 최종 시간표 생성 및 카톡 공유 기능 -->
   <div class="card">
-    <h2>5. 겹치지 않는 최종 시간표 생성</h2>
+    <h2>5. 겹치지 않는 최종 시간표 생성 및 공유</h2>
     <p style="font-size: 0.85rem; color: #666; margin-top: 0;">
-      서로 다른 그룹 간 파티 구성 및 연속 시간대 우선 배치를 렉 없이 즉각 연산합니다.
+      서로 다른 그룹 간 파티 구성 및 연속 시간대 우선 배치를 즉각 연산합니다.
     </p>
     <button type="button" class="btn btn-success" onclick="solveSchedule()">최종 시간표 자동 생성</button>
-    <div id="scheduleResults" style="margin-top: 15px;"></div>
+    
+    <!-- 결과 및 공유 컨테이너 -->
+    <div id="resultContainer" style="display: none; margin-top: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+        <h3 style="margin: 0; font-size: 1.1rem; color: #1c7ed6;">📅 생성된 주간 레이드 시간표</h3>
+        <div style="display: flex; gap: 6px;">
+          <button type="button" class="btn btn-share-kakao" onclick="copyScheduleText()">📋 텍스트 복사 (카톡용)</button>
+          <button type="button" class="btn btn-share-img" onclick="downloadScheduleImage()">🖼️ 이미지로 저장</button>
+        </div>
+      </div>
+
+      <!-- 이미지 캡처 대상 영역 -->
+      <div id="captureArea" class="result-capture-area">
+        <div id="scheduleResults"></div>
+      </div>
+    </div>
   </div>
 
 </div>
@@ -150,6 +174,7 @@
   let bosses = []; 
   let groups = {}; 
   let activeGroup = null;
+  let currentScheduleData = []; // 카톡 텍스트 복사용 캐시
 
   const days = ['목', '금', '토', '일', '월', '화', '수'];
   const timeSlots = [];
@@ -469,25 +494,24 @@
     document.querySelectorAll('.slot-cell').forEach(c => c.classList.remove('selected'));
   }
 
-  // --- 초경량 선형 매칭 알고리즘 (루프/재귀 완전 제거, 0.01초 즉각 완료) ---
+  // --- 초경량 선형 매칭 알고리즘 ---
   function solveSchedule() {
+    const resultContainer = document.getElementById('resultContainer');
     const resultDiv = document.getElementById('scheduleResults');
-    resultDiv.innerHTML = '<h3>최적 스케줄링 결과</h3>';
+    resultDiv.innerHTML = '';
+    currentScheduleData = [];
 
-    // 1. 단일 루프로 안전하게 파티 분할 (재귀 없음)
     const partyUnits = [];
 
     bosses.forEach(boss => {
       let pool = [...boss.members];
       let partyIndex = 1;
 
-      // 최대 시도 횟수 제한(안전장치: 최대 50개 파티)
       for (let attempt = 0; attempt < 50 && pool.length > 0; attempt++) {
         const selectedMembers = [];
         const usedGroupsInParty = new Set();
         let currentSum = 0;
 
-        // 서로 다른 그룹의 캐릭터를 순서대로 탐색하여 담기
         for (let i = 0; i < pool.length; i++) {
           const candidate = pool[i];
           if (!usedGroupsInParty.has(candidate.group)) {
@@ -495,14 +519,12 @@
             usedGroupsInParty.add(candidate.group);
             currentSum += candidate.score;
 
-            // 목표치 충족 or 최대 인원수 도달 시 파티 결성
             if (currentSum >= boss.targetScore || selectedMembers.length >= boss.count) {
               break;
             }
           }
         }
 
-        // 목표 수치 이상을 달성했는지 확인
         if (currentSum >= boss.targetScore) {
           partyUnits.push({
             bossName: boss.name,
@@ -511,24 +533,22 @@
             partyNumber: partyIndex++
           });
 
-          // 풀에서 선발된 캐릭터 안전하게 제거
           selectedMembers.forEach(sel => {
             const idx = pool.findIndex(m => m.group === sel.group && m.name === sel.name);
             if (idx !== -1) pool.splice(idx, 1);
           });
         } else {
-          // 남은 캐릭터들로는 목표치를 넘길 수 없으면 즉시 종료
           break;
         }
       }
     });
 
     if (partyUnits.length === 0) {
-      resultDiv.innerHTML += '<p style="color:#fa5252;">서로 다른 그룹을 조합하여 목표 수치를 넘는 파티를 구성하지 못했습니다. 보스 풀에 다른 그룹의 캐릭터를 추가하거나 목표치를 확인해주세요.</p>';
+      resultContainer.style.display = 'block';
+      resultDiv.innerHTML = '<p style="color:#fa5252;">서로 다른 그룹을 조합하여 목표 수치를 넘는 파티를 구성하지 못했습니다. 보스 풀에 다른 그룹의 캐릭터를 추가하거나 목표치를 확인해주세요.</p>';
       return;
     }
 
-    // 2. 시간 슬롯 목록 준비
     const allSlots = [];
     days.forEach((_, dIdx) => {
       timeSlots.forEach((slot, sIdx) => {
@@ -536,7 +556,6 @@
       });
     });
 
-    // 3. 파티별 최적 연속 시간대 배치 (그리디 방식, 지연 0)
     const finalAssignments = [];
     const usedSlotKeys = new Set();
     const usedGroupSlots = new Set();
@@ -546,12 +565,10 @@
       let chosenSlot = null;
       let highestBonus = -1;
 
-      // 가능한 슬롯 중 가장 연속성이 좋은 1개 슬롯 탐색
       for (let s = 0; s < allSlots.length; s++) {
         const slot = allSlots[s];
         if (usedSlotKeys.has(slot.key)) continue;
 
-        // 파티원 전원 출석 가능 여부 검사
         let canAllJoin = true;
         for (let m of party.members) {
           const grp = groups[m.group];
@@ -563,29 +580,28 @@
         }
 
         if (canAllJoin) {
-          // 연속 슬롯 점수 계산
           let bonus = 0;
           party.members.forEach(m => {
             const userSlots = userTimeline[m.group] || [];
             if (userSlots.includes(slot.linearIdx - 1) || userSlots.includes(slot.linearIdx + 1)) {
-              bonus += 100; // 연속 보너스
+              bonus += 100;
             }
           });
 
           if (bonus > highestBonus) {
             highestBonus = bonus;
             chosenSlot = slot;
-            if (bonus > 0) break; // 완벽한 연속 슬롯을 찾으면 즉시 선택하여 연산 가속
+            if (bonus > 0) break;
           }
         }
       }
 
       if (!chosenSlot) {
-        resultDiv.innerHTML += `<p style="color:#fa5252;"><b>[${party.bossName} - 파티 ${party.partyNumber}]</b> 파티원들의 주간 가능 시간대가 일치하지 않거나 빈 시간이 부족합니다. 주간 시간표를 더 넓게 선택해주세요.</p>`;
+        resultContainer.style.display = 'block';
+        resultDiv.innerHTML = `<p style="color:#fa5252;"><b>[${party.bossName} - 파티 ${party.partyNumber}]</b> 파티원들의 주간 가능 시간대가 일치하지 않거나 빈 시간이 부족합니다. 주간 시간표를 더 넓게 선택해주세요.</p>`;
         return;
       }
 
-      // 슬롯 확정
       usedSlotKeys.add(chosenSlot.key);
       party.members.forEach(m => {
         usedGroupSlots.add(`${m.group}_${chosenSlot.key}`);
@@ -596,11 +612,14 @@
       finalAssignments.push({ party, slot: chosenSlot });
     }
 
-    // 4. 결과 출력
+    // 결과 렌더링
     finalAssignments.sort((a, b) => {
       if (a.slot.dayIdx !== b.slot.dayIdx) return a.slot.dayIdx - b.slot.dayIdx;
       return a.slot.slotIdx - b.slot.slotIdx;
     });
+
+    currentScheduleData = finalAssignments; // 캐시 보관
+    resultContainer.style.display = 'block';
 
     finalAssignments.forEach(item => {
       const sum = item.party.members.reduce((acc, m) => acc + m.score, 0).toFixed(1);
@@ -617,6 +636,45 @@
           </div>
         </div>
       `;
+    });
+  }
+
+  // --- 카카오톡용 텍스트 복사 기능 ---
+  function copyScheduleText() {
+    if (!currentScheduleData || currentScheduleData.length === 0) {
+      alert('복사할 시간표가 없습니다.');
+      return;
+    }
+
+    let text = "📢 [주간 레이드 시간표 확정 안내]\n\n";
+    currentScheduleData.forEach((item, idx) => {
+      const day = days[item.slot.dayIdx];
+      const time = item.slot.time;
+      const members = item.party.members.map(m => `${m.group}(${m.name})`).join(', ');
+      text += `${idx + 1}. [${day}요일 ${time}] ${item.party.bossName}\n   - 참여자: ${members}\n\n`;
+    });
+    text += "지각하지 말고 제시간에 와주세요! 🔥";
+
+    navigator.clipboard.writeText(text).then(() => {
+      alert("시간표 요약 텍스트가 복사되었습니다!\n카카오톡 채팅방에 바로 붙여넣기(Ctrl+V)하세요.");
+    }).catch(() => {
+      alert("클립보드 복사에 실패했습니다. 수동으로 복사해주세요.");
+    });
+  }
+
+  // --- 시간표 이미지 저장 기능 ---
+  function downloadScheduleImage() {
+    const target = document.getElementById('captureArea');
+    if (!target || !currentScheduleData || currentScheduleData.length === 0) {
+      alert('저장할 시간표가 없습니다.');
+      return;
+    }
+
+    html2canvas(target, { backgroundColor: '#ffffff', scale: 2 }).then(canvas => {
+      const link = document.createElement('a');
+      link.download = '주간_레이드_시간표.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
     });
   }
 
