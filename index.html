@@ -22,10 +22,11 @@
     .btn-success { background: #40c057; color: white; width: 100%; padding: 14px; font-size: 1.05rem; }
 
     /* 보스 카드 목록 */
-    .boss-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-top: 10px; }
+    .boss-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; margin-top: 10px; }
     .boss-item { border: 1px solid #ced4da; border-radius: 8px; padding: 12px; background: #f8f9fa; }
     .boss-item.valid { border-color: #40c057; background: #ebfbee; }
     .badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: 500; background: #e7f5ff; color: #1971c2; border: 1px solid #a5d8ff; margin: 3px; }
+    .badge-member { background: #edf2ff; color: #364fc7; border: 1px solid #bac8ff; }
 
     /* 드래그 주간 시간표 */
     .timetable-wrapper { overflow-x: auto; border: 1px solid #ced4da; border-radius: 6px; user-select: none; max-height: 400px; margin-top: 8px; }
@@ -44,19 +45,19 @@
 
 <div class="container">
 
-  <!-- 1. 보스 약속 생성 -->
+  <!-- 1. 보스 약속 생성 및 참여 캐릭터 목록 -->
   <div class="card">
-    <h2>1. 보스 약속 설정</h2>
+    <h2>1. 보스 약속 설정 및 참여 현황</h2>
     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
       <input type="text" id="bossName" placeholder="보스명 (예: 루시드 2인)" style="flex: 2; min-width: 160px;">
       <input type="number" id="bossTargetScore" step="0.1" placeholder="목표치 (예: 11.7)" style="flex: 1; min-width: 120px;">
-      <input type="number" id="bossHeadcount" min="1" max="10" placeholder="인원수 (예: 2)" style="flex: 1; min-width: 100px;">
+      <input type="number" id="bossHeadcount" min="1" max="10" placeholder="최대 인원수 (예: 2)" style="flex: 1; min-width: 100px;">
       <button type="button" class="btn btn-primary" onclick="addBoss()">보스 생성</button>
     </div>
     <div class="boss-grid" id="bossContainer"></div>
   </div>
 
-  <!-- 2. 그룹 선택 및 캐릭터 등록 (독립 블록화) -->
+  <!-- 2. 그룹 선택 및 캐릭터 등록 -->
   <div class="card">
     <h2>2. 그룹(참여자) 및 캐릭터 등록</h2>
     
@@ -79,7 +80,7 @@
       </div>
     </div>
 
-    <!-- 캐릭터 추가 폼 (독립된 주황색 버튼으로 항상 명확히 노출) -->
+    <!-- 캐릭터 추가 폼 -->
     <div class="highlight-box">
       <div style="font-weight: bold; margin-bottom: 8px; color: #1971c2;" id="activeGroupDisplay">
         작업 대상: 그룹을 먼저 선택해주세요.
@@ -92,13 +93,13 @@
       </div>
       
       <div style="margin-top: 10px;">
-        <span style="font-size: 0.85rem; font-weight: bold; color: #495057;">등록된 캐릭터 목록:</span>
+        <span style="font-size: 0.85rem; font-weight: bold; color: #495057;">내 그룹 등록 캐릭터 목록:</span>
         <div id="groupCharList" style="margin-top: 6px; min-height: 30px;">(등록된 캐릭터가 없습니다)</div>
       </div>
     </div>
   </div>
 
-  <!-- 3. 주간 가능 시간대 등록 (가로 가림 방지를 위해 독립 섹션화) -->
+  <!-- 3. 주간 가능 시간대 등록 -->
   <div class="card">
     <h2>3. 선택된 그룹의 주간 가능 시간대 등록</h2>
     <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -122,7 +123,7 @@
   <div class="card">
     <h2>4. 보스 약속에 내 캐릭터 배치</h2>
     <p style="font-size: 0.85rem; color: #666; margin-top: 0;">
-      동일 캐릭터를 여러 보스 약속에 참여시킬 수 있습니다.
+      내 그룹의 캐릭터들을 보스에 배치하세요. (한 그룹 내 다른 캐릭터들도 같은 보스에 각각 참여 가능)
     </p>
     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
       <select id="charToAssign" style="flex: 1; min-width: 160px;">
@@ -139,7 +140,7 @@
   <div class="card">
     <h2>5. 겹치지 않는 최종 시간표 생성</h2>
     <p style="font-size: 0.85rem; color: #666; margin-top: 0;">
-      보스 간 시간 충돌을 방지하고 동일 유저 캐릭터의 연속 시간대를 최우선 고려합니다.
+      정원 미달이어도 목표치를 달성하면 출발합니다. 동일 유저의 약속은 가급적 연속 시간대로 배치됩니다.
     </p>
     <button type="button" class="btn btn-success" onclick="solveSchedule()">최종 시간표 자동 생성</button>
     <div id="scheduleResults" style="margin-top: 15px;"></div>
@@ -248,7 +249,8 @@
     const container = document.getElementById('bossContainer');
     container.innerHTML = bosses.map(b => {
       const currentScore = b.members.reduce((sum, m) => sum + m.score, 0).toFixed(1);
-      const isValid = b.members.length === b.count && parseFloat(currentScore) >= b.targetScore;
+      // 목표 수치를 채우면 정원 미달이어도 출발 가능 (조건 1 충족)
+      const isValid = parseFloat(currentScore) >= b.targetScore;
 
       return `
         <div class="boss-item ${isValid ? 'valid' : ''}">
@@ -257,13 +259,16 @@
             <button type="button" class="btn btn-danger" onclick="removeBoss('${b.id}')">삭제</button>
           </div>
           <div style="font-size:0.8rem; color:#495057; margin: 4px 0;">
-            목표치: ${b.targetScore} (현재: ${currentScore}) / 정원: ${b.members.length}/${b.count}
+            목표치: ${b.targetScore} (<strong>현재: ${currentScore}</strong>) / 인원: ${b.members.length}/${b.count}명
+            ${isValid ? '<span style="color:#2b8a3e; font-weight:bold; margin-left:4px;">[출발가능]</span>' : '<span style="color:#e03131; margin-left:4px;">[수치미달]</span>'}
           </div>
-          <div style="margin-top:6px;">
+          <div style="margin-top:6px; border-top: 1px dashed #dee2e6; padding-top: 6px;">
+            <div style="font-size:0.75rem; color:#868e96; margin-bottom:3px;">참여 캐릭터 현황:</div>
+            ${b.members.length === 0 ? '<span style="font-size:0.75rem; color:#adb5bd;">(참여 캐릭터 없음)</span>' : ''}
             ${b.members.map((m, idx) => `
-              <span class="badge">
-                ${m.group} - ${m.name}(${m.score})
-                <a href="javascript:void(0)" onclick="removeMemberFromBoss('${b.id}', ${idx})" style="color:#fa5252; text-decoration:none; margin-left:3px; font-weight:bold;">×</a>
+              <span class="badge badge-member">
+                <b>[${m.group}]</b> ${m.name} (${m.score})
+                <a href="javascript:void(0)" onclick="removeMemberFromBoss('${b.id}', ${idx})" style="color:#fa5252; text-decoration:none; margin-left:4px; font-weight:bold;">×</a>
               </span>
             `).join('')}
           </div>
@@ -424,7 +429,7 @@
       bosses.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
   }
 
-  // --- 보스 배치 ---
+  // --- 보스 배치 (조건 2: 동일 그룹의 다른 캐릭터도 참여 허용) ---
   function assignCharToBoss() {
     if (!activeGroup) { alert('그룹을 먼저 선택하세요.'); return; }
     const charName = document.getElementById('charToAssign').value;
@@ -438,13 +443,14 @@
 
     if (!char || !boss) return;
 
-    if (boss.members.some(m => m.group === activeGroup)) {
-      alert(`[${boss.name}] 보스에는 이미 ${activeGroup} 님의 캐릭터가 참여 중입니다.`);
+    // 완전히 동일한 캐릭터의 중복 투입만 방지 (다른 캐릭터는 허용)
+    if (boss.members.some(m => m.group === activeGroup && m.name === charName)) {
+      alert(`[${boss.name}] 보스에는 이미 ${charName} 캐릭터가 등록되어 있습니다.`);
       return;
     }
 
     if (boss.members.length >= boss.count) {
-      alert(`[${boss.name}] 보스는 정원(${boss.count}명)이 가득 찼습니다.`);
+      alert(`[${boss.name}] 보스는 최대 정원(${boss.count}명)이 가득 찼습니다.`);
       return;
     }
 
@@ -478,18 +484,19 @@
     document.querySelectorAll('.slot-cell').forEach(c => c.classList.remove('selected'));
   }
 
-  // --- 최적 스케줄링 엔진 ---
+  // --- 스케줄링 최적화 엔진 (조건 1: 정원 미달이어도 목표치 달성 시 출발) ---
   function solveSchedule() {
     const resultDiv = document.getElementById('scheduleResults');
     resultDiv.innerHTML = '<h3>최적 스케줄링 결과</h3>';
 
+    // 정원 충족 여부와 무관하게 목표치만 넘으면 출발 가능
     const validBosses = bosses.filter(b => {
       const sum = b.members.reduce((acc, m) => acc + m.score, 0);
-      return b.members.length === b.count && sum >= b.targetScore;
+      return sum >= b.targetScore && b.members.length > 0;
     });
 
     if (validBosses.length === 0) {
-      resultDiv.innerHTML += '<p style="color:#fa5252;">정원과 필요 수치를 충족한 완료 상태의 보스가 없습니다. 4단계 배치를 확인해주세요.</p>';
+      resultDiv.innerHTML += '<p style="color:#fa5252;">목표 스펙 수치를 충족한 출발 가능 상태의 보스가 없습니다. 보스 파티 구성을 먼저 완료해주세요.</p>';
       return;
     }
 
@@ -518,7 +525,7 @@
         timeline.sort((a, b) => a - b);
         for (let i = 0; i < timeline.length - 1; i++) {
           if (timeline[i + 1] - timeline[i] === 1) {
-            score += 20;
+            score += 20; // 연속 보너스
           }
         }
       });
@@ -540,6 +547,7 @@
       for (let s = 0; s < allSlots.length; s++) {
         const slot = allSlots[s];
 
+        // 보스 간 시간 충돌 방지
         if (usedSlotKeys.has(slot.key)) continue;
 
         let canAllJoin = true;
@@ -571,7 +579,7 @@
     search(0, [], new Set(), new Set());
 
     if (!bestSchedule || bestSchedule.length === 0) {
-      resultDiv.innerHTML += '<p style="color:#fa5252;">참여자들의 가능 시간대가 겹치지 않아 일정을 도출할 수 없습니다. 주간 가능 시간을 넓혀주세요.</p>';
+      resultDiv.innerHTML += '<p style="color:#fa5252;">참여자들의 가능 시간대가 겹치지 않아 일정을 도출할 수 없습니다. 참여자들의 주간 가능 시간을 넓혀주세요.</p>';
       return;
     }
 
@@ -582,7 +590,7 @@
 
     bestSchedule.forEach(item => {
       const sum = item.boss.members.reduce((acc, m) => acc + m.score, 0).toFixed(1);
-      const membersText = item.boss.members.map(m => `<b>${m.group}</b>(${m.name}: ${m.score})`).join(', ');
+      const membersText = item.boss.members.map(m => `<b>[${m.group}]</b> ${m.name}(${m.score})`).join(', ');
 
       resultDiv.innerHTML += `
         <div class="result-box">
@@ -590,7 +598,7 @@
             [${days[item.slot.dayIdx]}요일 ${item.slot.time}] ${item.boss.name}
           </div>
           <div style="font-size: 0.9rem; margin-top: 4px;">
-            - 파티 스펙 합: <b>${sum}</b> (요구치: ${item.boss.targetScore})<br>
+            - 파티 스펙 합: <b>${sum}</b> (요구치: ${item.boss.targetScore}) / 인원: ${item.boss.members.length}명<br>
             - 파티 구성원: ${membersText}
           </div>
         </div>
