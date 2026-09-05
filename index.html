@@ -45,7 +45,7 @@
 
 <div class="container">
 
-  <!-- 1. 보스 약속 생성 및 참여 캐릭터 목록 -->
+  <!-- 1. 보스 약속 설정 및 참여 현황 -->
   <div class="card">
     <h2>1. 보스 약속 설정 및 참여 현황</h2>
     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
@@ -57,13 +57,13 @@
     <div class="boss-grid" id="bossContainer"></div>
   </div>
 
-  <!-- 2. 그룹 선택 및 캐릭터 등록 -->
+  <!-- 2. 그룹(참여자) 및 캐릭터 등록 -->
   <div class="card">
     <h2>2. 그룹(참여자) 및 캐릭터 등록</h2>
     
     <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px;">
       <div style="flex: 1; min-width: 240px;">
-        <label>새 그룹 추가</label>
+        <label>새 그룹(참여자 닉네임) 추가</label>
         <div style="display: flex; gap: 6px;">
           <input type="text" id="newGroupName" placeholder="예: 철수" style="flex: 1;">
           <button type="button" class="btn btn-primary" onclick="createNewGroup()">그룹 생성</button>
@@ -119,11 +119,12 @@
     </div>
   </div>
 
-  <!-- 4. 보스 약속에 캐릭터 배치 -->
+  <!-- 4. 보스 약속에 캐릭터 배치 (단일 보스 내 1인 1캐릭 강제) -->
   <div class="card">
     <h2>4. 보스 약속에 내 캐릭터 배치</h2>
     <p style="font-size: 0.85rem; color: #666; margin-top: 0;">
-      내 그룹의 캐릭터들을 보스에 배치하세요. (한 그룹 내 다른 캐릭터들도 같은 보스에 각각 참여 가능)
+      * <b>규칙:</b> 한 사람은 동시에 여러 캐릭을 플레이할 수 없으므로, <b>하나의 보스 약속에는 1개 캐릭터만 배치</b>할 수 있으며 다른 그룹(사람)의 캐릭터들과 파티를 이룹니다.<br>
+      * 내 다른 캐릭터는 <b>다른 보스 약속</b>에 참여시킬 수 있습니다.
     </p>
     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
       <select id="charToAssign" style="flex: 1; min-width: 160px;">
@@ -140,7 +141,7 @@
   <div class="card">
     <h2>5. 겹치지 않는 최종 시간표 생성</h2>
     <p style="font-size: 0.85rem; color: #666; margin-top: 0;">
-      정원 미달이어도 목표치를 달성하면 출발합니다. 동일 유저의 약속은 가급적 연속 시간대로 배치됩니다.
+      서로 다른 보스에 배치된 동일 유저의 여러 캐릭터는 <b>동일 시간대에 겹치지 않으면서, 가능한 연속된 20분 슬롯으로 나란히 배치</b>됩니다.
     </p>
     <button type="button" class="btn btn-success" onclick="solveSchedule()">최종 시간표 자동 생성</button>
     <div id="scheduleResults" style="margin-top: 15px;"></div>
@@ -249,7 +250,6 @@
     const container = document.getElementById('bossContainer');
     container.innerHTML = bosses.map(b => {
       const currentScore = b.members.reduce((sum, m) => sum + m.score, 0).toFixed(1);
-      // 목표 수치를 채우면 정원 미달이어도 출발 가능 (조건 1 충족)
       const isValid = parseFloat(currentScore) >= b.targetScore;
 
       return `
@@ -267,7 +267,7 @@
             ${b.members.length === 0 ? '<span style="font-size:0.75rem; color:#adb5bd;">(참여 캐릭터 없음)</span>' : ''}
             ${b.members.map((m, idx) => `
               <span class="badge badge-member">
-                <b>[${m.group}]</b> ${m.name} (${m.score})
+                <b>[${m.group}]</b> ${m.name}(${m.score})
                 <a href="javascript:void(0)" onclick="removeMemberFromBoss('${b.id}', ${idx})" style="color:#fa5252; text-decoration:none; margin-left:4px; font-weight:bold;">×</a>
               </span>
             `).join('')}
@@ -429,7 +429,7 @@
       bosses.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
   }
 
-  // --- 보스 배치 (조건 2: 동일 그룹의 다른 캐릭터도 참여 허용) ---
+  // --- 보스 배치 로직 (단일 보스 내 1인 1캐릭터 강제) ---
   function assignCharToBoss() {
     if (!activeGroup) { alert('그룹을 먼저 선택하세요.'); return; }
     const charName = document.getElementById('charToAssign').value;
@@ -443,14 +443,15 @@
 
     if (!char || !boss) return;
 
-    // 완전히 동일한 캐릭터의 중복 투입만 방지 (다른 캐릭터는 허용)
-    if (boss.members.some(m => m.group === activeGroup && m.name === charName)) {
-      alert(`[${boss.name}] 보스에는 이미 ${charName} 캐릭터가 등록되어 있습니다.`);
+    // [핵심 규칙] 하나의 보스 약속에는 동일 그룹(한 사람)의 캐릭터가 이미 1개라도 있으면 추가 불가!
+    const existingMember = boss.members.find(m => m.group === activeGroup);
+    if (existingMember) {
+      alert(`[${boss.name}] 보스에는 이미 ${activeGroup} 님의 캐릭터 [${existingMember.name}]이(가) 등록되어 있습니다.\n\n한 사람은 동시에 여러 캐릭터를 플레이할 수 없으므로, 하나의 보스 약속에는 다른 사람(그룹)의 캐릭터와 파티를 맺어야 합니다.`);
       return;
     }
 
     if (boss.members.length >= boss.count) {
-      alert(`[${boss.name}] 보스는 최대 정원(${boss.count}명)이 가득 찼습니다.`);
+      alert(`[${boss.name}] 보스는 최대 정원(${boss.count}명)이 이미 가득 찼습니다.`);
       return;
     }
 
@@ -484,19 +485,19 @@
     document.querySelectorAll('.slot-cell').forEach(c => c.classList.remove('selected'));
   }
 
-  // --- 스케줄링 최적화 엔진 (조건 1: 정원 미달이어도 목표치 달성 시 출발) ---
+  // --- 최적 스케줄링 엔진 ---
   function solveSchedule() {
     const resultDiv = document.getElementById('scheduleResults');
     resultDiv.innerHTML = '<h3>최적 스케줄링 결과</h3>';
 
-    // 정원 충족 여부와 무관하게 목표치만 넘으면 출발 가능
+    // 목표 스펙 충족 보스 필터
     const validBosses = bosses.filter(b => {
       const sum = b.members.reduce((acc, m) => acc + m.score, 0);
       return sum >= b.targetScore && b.members.length > 0;
     });
 
     if (validBosses.length === 0) {
-      resultDiv.innerHTML += '<p style="color:#fa5252;">목표 스펙 수치를 충족한 출발 가능 상태의 보스가 없습니다. 보스 파티 구성을 먼저 완료해주세요.</p>';
+      resultDiv.innerHTML += '<p style="color:#fa5252;">목표 스펙 수치를 충족한 출발 가능 상태의 보스가 없습니다. 4단계 보스 파티 구성을 먼저 완료해주세요.</p>';
       return;
     }
 
@@ -510,6 +511,7 @@
     let bestSchedule = null;
     let maxScore = -1;
 
+    // 연속성 점수 계산기 (동일 유저가 참여하는 서로 다른 보스가 연속된 시간대일 경우 보너스)
     function evaluateContinuity(assignedSlots) {
       let score = 0;
       const userTimeline = {};
@@ -525,7 +527,7 @@
         timeline.sort((a, b) => a - b);
         for (let i = 0; i < timeline.length - 1; i++) {
           if (timeline[i + 1] - timeline[i] === 1) {
-            score += 20; // 연속 보너스
+            score += 20; // 20분 연속 슬롯 보너스 점수
           }
         }
       });
@@ -547,13 +549,15 @@
       for (let s = 0; s < allSlots.length; s++) {
         const slot = allSlots[s];
 
-        // 보스 간 시간 충돌 방지
+        // 1. 보스 간 시간대 충돌 방지
         if (usedSlotKeys.has(slot.key)) continue;
 
+        // 2. 이 보스에 참여하는 모든 멤버(서로 다른 그룹들)가 해당 슬롯에 가능한지 검증
         let canAllJoin = true;
         for (let m of boss.members) {
           const grp = groups[m.group];
           const hasSchedule = grp && grp.schedule && grp.schedule.includes(slot.key);
+          // 그룹이 비어있거나, 해당 슬롯에 불가능하거나, 이미 다른 보스 시간에 배정되었으면 불가
           if (!hasSchedule || usedGroupSlots.has(`${m.group}_${slot.key}`)) {
             canAllJoin = false;
             break;
@@ -579,7 +583,7 @@
     search(0, [], new Set(), new Set());
 
     if (!bestSchedule || bestSchedule.length === 0) {
-      resultDiv.innerHTML += '<p style="color:#fa5252;">참여자들의 가능 시간대가 겹치지 않아 일정을 도출할 수 없습니다. 참여자들의 주간 가능 시간을 넓혀주세요.</p>';
+      resultDiv.innerHTML += '<p style="color:#fa5252;">참여자들의 가능 시간대가 서로 맞지 않아 일정을 도출할 수 없습니다. 각 그룹의 주간 가능 시간을 넓혀주세요.</p>';
       return;
     }
 
