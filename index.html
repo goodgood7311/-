@@ -3,40 +3,40 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>주간 레이드 시간표 자동 조율기 (목~수)</title>
+  <title>주간 레이드 시간표 자동 조율기</title>
   <style>
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { padding: 16px; background-color: #f1f3f5; margin: 0; color: #212529; }
-    .container { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+    .container { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
     .card { background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.08); }
     h2 { margin-top: 0; font-size: 1.25rem; border-bottom: 2px solid #e9ecef; padding-bottom: 8px; }
-    h3 { margin-top: 15px; font-size: 1.05rem; }
     .form-group { margin-bottom: 12px; }
-    label { display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 5px; color: #495057; }
-    input, select, button { padding: 8px 10px; border: 1px solid #ced4da; border-radius: 5px; font-size: 0.9rem; }
+    label { display: block; font-weight: 600; font-size: 0.9rem; margin-bottom: 6px; color: #495057; }
+    input, select, button { padding: 10px 12px; border: 1px solid #ced4da; border-radius: 6px; font-size: 0.95rem; }
     .btn { cursor: pointer; font-weight: bold; border: none; transition: 0.2s; }
     .btn-primary { background: #228be6; color: white; }
     .btn-primary:hover { background: #1c7ed6; }
+    .btn-save-char { background: #fd7e14; color: white; min-width: 120px; font-size: 0.95rem; }
+    .btn-save-char:hover { background: #f76707; }
     .btn-danger { background: #fa5252; color: white; padding: 4px 8px; font-size: 0.8rem; }
-    .btn-success { background: #40c057; color: white; width: 100%; padding: 12px; font-size: 1rem; }
+    .btn-success { background: #40c057; color: white; width: 100%; padding: 14px; font-size: 1.05rem; }
 
     /* 보스 카드 목록 */
     .boss-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-top: 10px; }
     .boss-item { border: 1px solid #ced4da; border-radius: 8px; padding: 12px; background: #f8f9fa; }
     .boss-item.valid { border-color: #40c057; background: #ebfbee; }
-    .badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 500; background: #dee2e6; margin: 2px; }
-    .badge-user { background: #e7f5ff; color: #1971c2; border: 1px solid #a5d8ff; }
+    .badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: 500; background: #e7f5ff; color: #1971c2; border: 1px solid #a5d8ff; margin: 3px; }
 
     /* 드래그 주간 시간표 */
-    .timetable-wrapper { overflow-x: auto; border: 1px solid #ced4da; border-radius: 6px; user-select: none; max-height: 480px; }
-    .timetable { border-collapse: collapse; width: 100%; min-width: 700px; }
-    .timetable th, .timetable td { border: 1px solid #dee2e6; text-align: center; font-size: 0.75rem; padding: 6px 2px; }
+    .timetable-wrapper { overflow-x: auto; border: 1px solid #ced4da; border-radius: 6px; user-select: none; max-height: 400px; margin-top: 8px; }
+    .timetable { border-collapse: collapse; width: 100%; min-width: 600px; }
+    .timetable th, .timetable td { border: 1px solid #dee2e6; text-align: center; font-size: 0.8rem; padding: 8px 4px; }
     .timetable th { background: #e9ecef; position: sticky; top: 0; z-index: 3; }
-    .time-col { background: #f8f9fa; width: 70px; font-weight: bold; position: sticky; left: 0; z-index: 2; }
-    .slot-cell { cursor: pointer; background: #fff; }
+    .time-col { background: #f8f9fa; width: 75px; font-weight: bold; position: sticky; left: 0; z-index: 2; }
+    .slot-cell { cursor: pointer; background: #fff; height: 28px; }
     .slot-cell.selected { background-color: #339af0 !important; }
 
-    /* 결과 출력 */
+    .highlight-box { background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 14px; margin-top: 10px; }
     .result-box { background: #e7f5ff; border: 1px solid #74c0fc; border-radius: 6px; padding: 12px; margin-bottom: 10px; }
   </style>
 </head>
@@ -46,120 +46,112 @@
 
   <!-- 1. 보스 약속 생성 -->
   <div class="card">
-    <h2>1. 보스 약속 생성 & 파티 구성 현황</h2>
-    <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
-      <input type="text" id="bossName" placeholder="보스명 (예: 루시드 2인)">
-      <input type="number" id="bossTargetScore" step="0.1" placeholder="목표치 (예: 11.7)">
-      <input type="number" id="bossHeadcount" min="1" max="10" placeholder="인원수 (예: 2)">
+    <h2>1. 보스 약속 설정</h2>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+      <input type="text" id="bossName" placeholder="보스명 (예: 루시드 2인)" style="flex: 2; min-width: 160px;">
+      <input type="number" id="bossTargetScore" step="0.1" placeholder="목표치 (예: 11.7)" style="flex: 1; min-width: 120px;">
+      <input type="number" id="bossHeadcount" min="1" max="10" placeholder="인원수 (예: 2)" style="flex: 1; min-width: 100px;">
       <button type="button" class="btn btn-primary" onclick="addBoss()">보스 생성</button>
     </div>
-
     <div class="boss-grid" id="bossContainer"></div>
   </div>
 
-  <!-- 2. 참여자 그룹 및 주간 일정 등록 -->
+  <!-- 2. 그룹 선택 및 캐릭터 등록 (독립 블록화) -->
   <div class="card">
-    <h2>2. 그룹(참여자) 및 캐릭터 관리 / 주간 가능 시간 입력</h2>
+    <h2>2. 그룹(참여자) 및 캐릭터 등록</h2>
     
-    <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-      <div style="flex: 1; min-width: 280px;">
-        
-        <!-- 그룹 신규 생성 -->
-        <div class="form-group">
-          <label>새 그룹(참여자) 추가</label>
-          <div style="display: flex; gap: 6px;">
-            <input type="text" id="newGroupName" placeholder="예: 철수, 영희" style="flex: 1;">
-            <button type="button" class="btn btn-primary" onclick="createNewGroup()">그룹 추가</button>
-          </div>
-        </div>
-
-        <!-- 기존 그룹 선택 드롭다운 -->
-        <div class="form-group">
-          <label>작업할 그룹 선택</label>
-          <div style="display: flex; gap: 6px;">
-            <select id="groupSelect" style="flex: 1;" onchange="switchGroup(this.value)">
-              <option value="">-- 그룹을 선택하세요 --</option>
-            </select>
-            <button type="button" class="btn btn-danger" onclick="deleteCurrentGroup()">그룹 삭제</button>
-          </div>
-        </div>
-
-        <!-- 선택된 그룹 작업 영역 -->
-        <div id="groupActiveArea" style="display: none; border-top: 2px dashed #dee2e6; padding-top: 12px;">
-          <h3 id="currentGroupTitle" style="margin-top: 0; color: #1971c2;"></h3>
-          
-          <!-- 캐릭터 추가 및 저장 -->
-          <div class="form-group">
-            <label>내 캐릭터 추가 및 저장 (계속해서 추가 가능)</label>
-            <div style="display: flex; gap: 6px;">
-              <input type="text" id="charName" placeholder="캐릭명 (예: 캐릭1)" style="flex: 2;">
-              <input type="number" id="charScore" step="0.1" placeholder="수치 (예: 6.0)" style="flex: 1;">
-              <button type="button" class="btn btn-primary" onclick="saveCharacterToGroup()">캐릭터 저장</button>
-            </div>
-            <!-- 저장된 캐릭터 목록 확인 -->
-            <div id="groupCharList" style="margin-top: 8px;"></div>
-          </div>
-
-          <!-- 보스 약속에 캐릭터 배치 -->
-          <div class="form-group" style="border-top: 1px solid #eee; padding-top: 10px;">
-            <label>보스 약속에 내 캐릭터 등록</label>
-            <div style="display: flex; gap: 6px;">
-              <select id="charToAssign" style="flex: 1;">
-                <option value="">캐릭터를 선택하세요</option>
-              </select>
-              <select id="bossToAssign" style="flex: 1;">
-                <option value="">보스를 선택하세요</option>
-              </select>
-              <button type="button" class="btn btn-primary" onclick="assignCharToBoss()">배치</button>
-            </div>
-            <p style="font-size: 0.75rem; color: #868e96; margin-top: 4px;">
-              * 같은 캐릭터라도 다른 보스 약속에 여러 번 배치할 수 있습니다.
-            </p>
-          </div>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px;">
+      <div style="flex: 1; min-width: 240px;">
+        <label>새 그룹 추가</label>
+        <div style="display: flex; gap: 6px;">
+          <input type="text" id="newGroupName" placeholder="예: 철수" style="flex: 1;">
+          <button type="button" class="btn btn-primary" onclick="createNewGroup()">그룹 생성</button>
         </div>
       </div>
+      <div style="flex: 1; min-width: 240px;">
+        <label>작업할 그룹 선택</label>
+        <div style="display: flex; gap: 6px;">
+          <select id="groupSelect" style="flex: 1;" onchange="switchGroup(this.value)">
+            <option value="">-- 그룹을 선택하세요 --</option>
+          </select>
+          <button type="button" class="btn btn-danger" onclick="deleteCurrentGroup()">그룹 삭제</button>
+        </div>
+      </div>
+    </div>
 
-      <!-- 주간 드래그 일정표 -->
-      <div style="flex: 2; min-width: 320px;" id="scheduleArea">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-          <label style="margin: 0;"><strong>선택된 그룹의 주간 가능 시간 (목요일 ~ 다음 주 수요일)</strong></label>
-          <span style="font-size: 0.75rem; color: #868e96;">* 마우스 드래그로 선택/해제</span>
-        </div>
-        <div class="timetable-wrapper">
-          <table class="timetable" id="timetable">
-            <thead>
-              <tr id="timetableHeader">
-                <th class="time-col">시간</th>
-              </tr>
-            </thead>
-            <tbody id="timetableBody"></tbody>
-          </table>
-        </div>
-        <button type="button" class="btn btn-primary" style="width: 100%; margin-top: 10px;" onclick="saveCurrentGroupSchedule()">선택된 그룹 시간표 저장</button>
+    <!-- 캐릭터 추가 폼 (독립된 주황색 버튼으로 항상 명확히 노출) -->
+    <div class="highlight-box">
+      <div style="font-weight: bold; margin-bottom: 8px; color: #1971c2;" id="activeGroupDisplay">
+        작업 대상: 그룹을 먼저 선택해주세요.
+      </div>
+      <label>캐릭터 추가 및 저장</label>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <input type="text" id="charName" placeholder="캐릭터명 (예: 캐릭1)" style="flex: 2; min-width: 140px;">
+        <input type="number" id="charScore" step="0.1" placeholder="수치 (예: 6.0)" style="flex: 1; min-width: 100px;">
+        <button type="button" class="btn btn-save-char" onclick="saveCharacterToGroup()">★ 캐릭터 저장</button>
+      </div>
+      
+      <div style="margin-top: 10px;">
+        <span style="font-size: 0.85rem; font-weight: bold; color: #495057;">등록된 캐릭터 목록:</span>
+        <div id="groupCharList" style="margin-top: 6px; min-height: 30px;">(등록된 캐릭터가 없습니다)</div>
       </div>
     </div>
   </div>
 
-  <!-- 3. 최종 시간표 계산기 -->
+  <!-- 3. 주간 가능 시간대 등록 (가로 가림 방지를 위해 독립 섹션화) -->
   <div class="card">
-    <h2>3. 겹치지 않는 최종 시간표 생성</h2>
-    <p style="font-size: 0.85rem; color: #666; margin: 0 0 10px 0;">
-      보스 간 시간 겹침을 방지하고, 같은 그룹(유저)의 여러 캐릭터가 연속해서 약속을 진행할 수 있도록 최적 슬롯을 찾습니다.
+    <h2>3. 선택된 그룹의 주간 가능 시간대 등록</h2>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span style="font-size: 0.85rem; color: #495057;">마우스로 드래그하여 가능한 시간대를 파란색으로 활성화하세요.</span>
+      <button type="button" class="btn btn-primary" onclick="saveCurrentGroupSchedule()">시간표 저장</button>
+    </div>
+
+    <div class="timetable-wrapper">
+      <table class="timetable" id="timetable">
+        <thead>
+          <tr id="timetableHeader">
+            <th class="time-col">시간</th>
+          </tr>
+        </thead>
+        <tbody id="timetableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 4. 보스 약속에 캐릭터 배치 -->
+  <div class="card">
+    <h2>4. 보스 약속에 내 캐릭터 배치</h2>
+    <p style="font-size: 0.85rem; color: #666; margin-top: 0;">
+      동일 캐릭터를 여러 보스 약속에 참여시킬 수 있습니다.
+    </p>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+      <select id="charToAssign" style="flex: 1; min-width: 160px;">
+        <option value="">-- 캐릭터 선택 --</option>
+      </select>
+      <select id="bossToAssign" style="flex: 1; min-width: 160px;">
+        <option value="">-- 보스 선택 --</option>
+      </select>
+      <button type="button" class="btn btn-primary" onclick="assignCharToBoss()">보스에 배치</button>
+    </div>
+  </div>
+
+  <!-- 5. 최종 시간표 생성 -->
+  <div class="card">
+    <h2>5. 겹치지 않는 최종 시간표 생성</h2>
+    <p style="font-size: 0.85rem; color: #666; margin-top: 0;">
+      보스 간 시간 충돌을 방지하고 동일 유저 캐릭터의 연속 시간대를 최우선 고려합니다.
     </p>
     <button type="button" class="btn btn-success" onclick="solveSchedule()">최종 시간표 자동 생성</button>
-
     <div id="scheduleResults" style="margin-top: 15px;"></div>
   </div>
 
 </div>
 
 <script>
-  // --- 상태 관리 ---
   let bosses = []; 
-  let groups = {}; // { '철수': { chars: [{ name, score }], schedule: ['0_18:00'] } }
+  let groups = {}; 
   let activeGroup = null;
 
-  // 목요일(0) ~ 다음 주 수요일(6)
   const days = ['목', '금', '토', '일', '월', '화', '수'];
   const timeSlots = [];
   for (let h = 18; h < 24; h++) {
@@ -168,20 +160,19 @@
     }
   }
 
-  // --- 로컬 스토리지 데이터 동기화 (새로고침 시 유지) ---
   function saveData() {
     localStorage.setItem('raid_bosses', JSON.stringify(bosses));
     localStorage.setItem('raid_groups', JSON.stringify(groups));
   }
 
   function loadData() {
-    const savedBosses = localStorage.getItem('raid_bosses');
-    const savedGroups = localStorage.getItem('raid_groups');
-    if (savedBosses) bosses = JSON.parse(savedBosses);
-    if (savedGroups) groups = JSON.parse(savedGroups);
+    const b = localStorage.getItem('raid_bosses');
+    const g = localStorage.getItem('raid_groups');
+    if (b) bosses = JSON.parse(b);
+    if (g) groups = JSON.parse(g);
   }
 
-  // --- 주간 시간표 UI 생성 및 마우스 드래그 로직 ---
+  // --- 시간표 렌더링 및 드래그 ---
   let isMouseDown = false;
   let targetSelectionMode = true;
 
@@ -203,7 +194,7 @@
     const table = document.getElementById('timetable');
     table.addEventListener('mousedown', (e) => {
       if (!e.target.classList.contains('slot-cell')) return;
-      if (!activeGroup) { alert('먼저 그룹을 선택하거나 추가해주세요.'); return; }
+      if (!activeGroup) { alert('2단계에서 그룹을 먼저 선택해주세요.'); return; }
       isMouseDown = true;
       targetSelectionMode = !e.target.classList.contains('selected');
       toggleCell(e.target, targetSelectionMode);
@@ -228,14 +219,11 @@
   // --- 보스 관리 ---
   function addBoss() {
     const name = document.getElementById('bossName').value.trim();
-    const scoreVal = document.getElementById('bossTargetScore').value;
-    const countVal = document.getElementById('bossHeadcount').value;
-
-    const score = parseFloat(scoreVal);
-    const count = parseInt(countVal, 10);
+    const score = parseFloat(document.getElementById('bossTargetScore').value);
+    const count = parseInt(document.getElementById('bossHeadcount').value, 10);
 
     if (!name || isNaN(score) || isNaN(count) || count <= 0) {
-      alert('보스 정보(이름, 필요 수치, 인원수)를 올바르게 입력하세요.');
+      alert('보스명, 필요 스펙 수치, 인원수를 올바르게 입력하세요.');
       return;
     }
 
@@ -260,9 +248,7 @@
     const container = document.getElementById('bossContainer');
     container.innerHTML = bosses.map(b => {
       const currentScore = b.members.reduce((sum, m) => sum + m.score, 0).toFixed(1);
-      const isCountValid = b.members.length === b.count;
-      const isScoreValid = parseFloat(currentScore) >= b.targetScore;
-      const isValid = isCountValid && isScoreValid;
+      const isValid = b.members.length === b.count && parseFloat(currentScore) >= b.targetScore;
 
       return `
         <div class="boss-item ${isValid ? 'valid' : ''}">
@@ -271,11 +257,11 @@
             <button type="button" class="btn btn-danger" onclick="removeBoss('${b.id}')">삭제</button>
           </div>
           <div style="font-size:0.8rem; color:#495057; margin: 4px 0;">
-            목표: ${b.targetScore} (현재: ${currentScore}) / 정원: ${b.members.length}/${b.count}
+            목표치: ${b.targetScore} (현재: ${currentScore}) / 정원: ${b.members.length}/${b.count}
           </div>
           <div style="margin-top:6px;">
             ${b.members.map((m, idx) => `
-              <span class="badge badge-user">
+              <span class="badge">
                 ${m.group} - ${m.name}(${m.score})
                 <a href="javascript:void(0)" onclick="removeMemberFromBoss('${b.id}', ${idx})" style="color:#fa5252; text-decoration:none; margin-left:3px; font-weight:bold;">×</a>
               </span>
@@ -311,27 +297,28 @@
 
   function updateGroupDropdown() {
     const sel = document.getElementById('groupSelect');
-    const prevVal = activeGroup;
+    const prev = activeGroup;
     sel.innerHTML = '<option value="">-- 그룹을 선택하세요 --</option>' + 
       Object.keys(groups).map(g => `<option value="${g}">${g}</option>`).join('');
-    if (prevVal && groups[prevVal]) sel.value = prevVal;
+    if (prev && groups[prev]) sel.value = prev;
   }
 
   function switchGroup(groupName) {
     activeGroup = groupName || null;
-    const activeArea = document.getElementById('groupActiveArea');
+    const display = document.getElementById('activeGroupDisplay');
     const select = document.getElementById('groupSelect');
 
     if (!activeGroup) {
-      activeArea.style.display = 'none';
+      display.innerText = '작업 대상: 그룹을 먼저 선택해주세요.';
       select.value = '';
       clearScheduleUI();
+      renderGroupChars();
+      updateCharAssignSelect();
       return;
     }
 
     select.value = activeGroup;
-    activeArea.style.display = 'block';
-    document.getElementById('currentGroupTitle').innerText = `[${activeGroup}] 그룹 작업 중`;
+    display.innerText = `현재 선택된 그룹: [${activeGroup}]`;
 
     renderGroupChars();
     loadGroupSchedule();
@@ -341,7 +328,7 @@
 
   function deleteCurrentGroup() {
     if (!activeGroup) { alert('삭제할 그룹을 먼저 선택하세요.'); return; }
-    if (!confirm(`[${activeGroup}] 그룹을 정말 삭제하시겠습니까?\n배치된 보스 파티원 목록에서도 제거됩니다.`)) return;
+    if (!confirm(`[${activeGroup}] 그룹을 정말 삭제하시겠습니까?`)) return;
 
     bosses.forEach(b => {
       b.members = b.members.filter(m => m.group !== activeGroup);
@@ -355,37 +342,32 @@
     renderBosses();
   }
 
-  // 캐릭터 저장 함수
   function saveCharacterToGroup() {
     if (!activeGroup) {
-      alert('그룹을 먼저 선택하세요.');
+      alert('그룹을 먼저 선택하거나 생성해주세요.');
       return;
     }
+
     const nameInput = document.getElementById('charName');
     const scoreInput = document.getElementById('charScore');
-
     const name = nameInput.value.trim();
     const score = parseFloat(scoreInput.value);
 
     if (!name || isNaN(score)) {
-      alert('캐릭터 이름과 수치를 올바르게 입력하세요.');
+      alert('캐릭터명과 올바른 수치(숫자)를 입력하세요.');
       return;
     }
 
-    if (!groups[activeGroup].chars) {
-      groups[activeGroup].chars = [];
-    }
+    if (!groups[activeGroup].chars) groups[activeGroup].chars = [];
 
     if (groups[activeGroup].chars.some(c => c.name === name)) {
-      alert('이미 동일한 이름의 캐릭터가 현재 그룹에 존재합니다.');
+      alert('현재 그룹에 이미 동일한 이름의 캐릭터가 있습니다.');
       return;
     }
 
-    // 캐릭터 추가 후 저장
     groups[activeGroup].chars.push({ name, score });
     saveData();
 
-    // UI 및 드롭다운 갱신
     renderGroupChars();
     updateCharAssignSelect();
 
@@ -410,14 +392,14 @@
 
   function renderGroupChars() {
     const container = document.getElementById('groupCharList');
-    if (!activeGroup || !groups[activeGroup] || !groups[activeGroup].chars) {
-      container.innerHTML = '';
+    if (!activeGroup || !groups[activeGroup] || !groups[activeGroup].chars || groups[activeGroup].chars.length === 0) {
+      container.innerHTML = '<span style="color:#868e96; font-size:0.85rem;">(등록된 캐릭터가 없습니다)</span>';
       return;
     }
     container.innerHTML = groups[activeGroup].chars.map(c => `
-      <span class="badge badge-user">
+      <span class="badge">
         ${c.name} (${c.score})
-        <a href="javascript:void(0)" onclick="removeCharFromGroup('${c.name}')" style="color:#fa5252; text-decoration:none; margin-left:3px; font-weight:bold;">×</a>
+        <a href="javascript:void(0)" onclick="removeCharFromGroup('${c.name}')" style="color:#fa5252; text-decoration:none; margin-left:4px; font-weight:bold;">×</a>
       </span>
     `).join('');
   }
@@ -442,23 +424,14 @@
       bosses.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
   }
 
-  // --- 캐릭터를 보스에 배치 ---
+  // --- 보스 배치 ---
   function assignCharToBoss() {
-    if (!activeGroup) {
-      alert('그룹을 먼저 선택하세요.');
-      return;
-    }
+    if (!activeGroup) { alert('그룹을 먼저 선택하세요.'); return; }
     const charName = document.getElementById('charToAssign').value;
     const bossId = document.getElementById('bossToAssign').value;
 
-    if (!charName) {
-      alert('배치할 캐릭터를 선택하세요.');
-      return;
-    }
-    if (!bossId) {
-      alert('배치할 보스를 선택하세요.');
-      return;
-    }
+    if (!charName) { alert('배치할 캐릭터를 선택하세요.'); return; }
+    if (!bossId) { alert('배치할 보스를 선택하세요.'); return; }
 
     const char = groups[activeGroup].chars.find(c => c.name === charName);
     const boss = bosses.find(b => b.id === bossId);
@@ -466,12 +439,12 @@
     if (!char || !boss) return;
 
     if (boss.members.some(m => m.group === activeGroup)) {
-      alert(`[${boss.name}] 보스에는 이미 ${activeGroup} 님의 캐릭터가 참여 중입니다.\n(동일 보스 파티 내 중복 참여 불가)`);
+      alert(`[${boss.name}] 보스에는 이미 ${activeGroup} 님의 캐릭터가 참여 중입니다.`);
       return;
     }
 
     if (boss.members.length >= boss.count) {
-      alert(`[${boss.name}] 보스는 정원(${boss.count}명)이 이미 가득 찼습니다.`);
+      alert(`[${boss.name}] 보스는 정원(${boss.count}명)이 가득 찼습니다.`);
       return;
     }
 
@@ -481,22 +454,20 @@
     alert(`[${boss.name}]에 [${char.name}] 배치가 완료되었습니다.`);
   }
 
+  // --- 시간표 저장 및 로드 ---
   function saveCurrentGroupSchedule() {
     if (!activeGroup) { alert('그룹을 먼저 선택하세요.'); return; }
     const selectedCells = document.querySelectorAll('.slot-cell.selected');
-    const scheduleArr = [];
-    selectedCells.forEach(cell => {
-      scheduleArr.push(cell.getAttribute('data-key'));
-    });
-    groups[activeGroup].schedule = scheduleArr;
+    const arr = [];
+    selectedCells.forEach(cell => arr.push(cell.getAttribute('data-key')));
+    groups[activeGroup].schedule = arr;
     saveData();
-    alert(`[${activeGroup}] 그룹의 주간 가능 시간대가 저장되었습니다.`);
+    alert(`[${activeGroup}] 그룹의 가능 시간표가 저장되었습니다.`);
   }
 
   function loadGroupSchedule() {
     clearScheduleUI();
     if (!activeGroup || !groups[activeGroup] || !groups[activeGroup].schedule) return;
-
     groups[activeGroup].schedule.forEach(key => {
       const cell = document.querySelector(`.slot-cell[data-key="${key}"]`);
       if (cell) cell.classList.add('selected');
@@ -504,11 +475,10 @@
   }
 
   function clearScheduleUI() {
-    const cells = document.querySelectorAll('.slot-cell');
-    cells.forEach(c => c.classList.remove('selected'));
+    document.querySelectorAll('.slot-cell').forEach(c => c.classList.remove('selected'));
   }
 
-  // --- 스케줄링 최적화 엔진 ---
+  // --- 최적 스케줄링 엔진 ---
   function solveSchedule() {
     const resultDiv = document.getElementById('scheduleResults');
     resultDiv.innerHTML = '<h3>최적 스케줄링 결과</h3>';
@@ -519,7 +489,7 @@
     });
 
     if (validBosses.length === 0) {
-      resultDiv.innerHTML += '<p style="color:#fa5252;">정원과 필요 스펙 수치를 모두 채운 완료 상태의 보스가 없습니다. 보스 파티 구성을 먼저 완료해주세요.</p>';
+      resultDiv.innerHTML += '<p style="color:#fa5252;">정원과 필요 수치를 충족한 완료 상태의 보스가 없습니다. 4단계 배치를 확인해주세요.</p>';
       return;
     }
 
@@ -576,11 +546,7 @@
         for (let m of boss.members) {
           const grp = groups[m.group];
           const hasSchedule = grp && grp.schedule && grp.schedule.includes(slot.key);
-          if (!hasSchedule) {
-            canAllJoin = false;
-            break;
-          }
-          if (usedGroupSlots.has(`${m.group}_${slot.key}`)) {
+          if (!hasSchedule || usedGroupSlots.has(`${m.group}_${slot.key}`)) {
             canAllJoin = false;
             break;
           }
@@ -605,7 +571,7 @@
     search(0, [], new Set(), new Set());
 
     if (!bestSchedule || bestSchedule.length === 0) {
-      resultDiv.innerHTML += '<p style="color:#fa5252;">참여자들의 가능 시간대가 겹치지 않아 보스 일정을 생성할 수 없습니다. 참여자들의 가능 시간을 더 넓혀주세요.</p>';
+      resultDiv.innerHTML += '<p style="color:#fa5252;">참여자들의 가능 시간대가 겹치지 않아 일정을 도출할 수 없습니다. 주간 가능 시간을 넓혀주세요.</p>';
       return;
     }
 
@@ -632,7 +598,6 @@
     });
   }
 
-  // 브라우저 로딩 시 초기화
   window.onload = () => {
     loadData();
     initTimetable();
