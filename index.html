@@ -55,7 +55,7 @@
 
 <div class="container">
 
-  <!-- 0. Firebase 실시간 클라우드 동기화 상태 바 -->
+  <!-- 0. Firebase 실시간 클라우드 상태 바 -->
   <div class="card" style="background: #ebfbee; border: 1px solid #8ce99a;">
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
       <div>
@@ -202,7 +202,6 @@
     appId: "1:709713584613:web:a2d39f146c8b0b72668f0c"
   };
 
-  // Firebase 초기화 및 Realtime Database 연결
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
@@ -220,7 +219,7 @@
     }
   }
 
-  // 데이터를 Firebase 클라우드에 즉시 저장
+  // Firebase 실시간 클라우드 전송
   function pushCloudData() {
     if (db) {
       db.ref('raid_data').set({
@@ -233,7 +232,7 @@
     }
   }
 
-  // Firebase 실시간 리스너
+  // Firebase 실시간 수신 리스너 (빈 배열 안전 보정 추가)
   function listenDatabase() {  
     if (!db) return;
     db.ref('raid_data').on('value', (snapshot) => {
@@ -241,14 +240,26 @@
       if (data) {
         bosses = data.bosses || [];
         groups = data.groups || {};
+
+        // Firebase에서 빈 배열이 사라지는 현상 방지
+        Object.keys(groups).forEach(gName => {
+          if (!groups[gName].chars) groups[gName].chars = [];
+          if (!groups[gName].schedule) groups[gName].schedule = [];
+        });
+        bosses.forEach(b => {
+          if (!b.members) b.members = [];
+        });
+
         renderBosses();
         updateGroupDropdown();
         updateBossAssignSelect();
+        
         if (activeGroup && groups[activeGroup]) {
           renderGroupChars();
           loadGroupSchedule();
           updateCharAssignSelect();
         }
+
         const status = document.getElementById('syncStatus');
         if (status) status.innerText = '(실시간 연동 중 🟢)';
       }
@@ -400,6 +411,9 @@
       return;
     }
 
+    if (!groups[activeGroup].chars) groups[activeGroup].chars = [];
+    if (!groups[activeGroup].schedule) groups[activeGroup].schedule = [];
+
     select.value = activeGroup;
     display.innerText = `현재 선택된 그룹: [${activeGroup}]`;
 
@@ -425,22 +439,38 @@
     renderBosses();
   }
 
+  // [수정] 캐릭터 저장 시 방어 코드 및 즉각 갱신 로직 추가
   function saveCharacterToGroup() {
     if (!activeGroup) { alert('그룹을 먼저 선택하거나 생성해주세요.'); return; }
+    
     const nameInput = document.getElementById('charName');
     const scoreInput = document.getElementById('charScore');
     const name = nameInput.value.trim();
     const score = parseFloat(scoreInput.value);
 
     if (!name || isNaN(score)) { alert('캐릭터명과 올바른 수치(숫자)를 입력하세요.'); return; }
-    if (!groups[activeGroup].chars) groups[activeGroup].chars = [];
-    if (groups[activeGroup].chars.some(c => c.name === name)) { alert('현재 그룹에 이미 동일한 이름의 캐릭터가 있습니다.'); return; }
+    
+    if (!groups[activeGroup]) {
+      groups[activeGroup] = { chars: [], schedule: [] };
+    }
+    if (!Array.isArray(groups[activeGroup].chars)) {
+      groups[activeGroup].chars = [];
+    }
 
+    if (groups[activeGroup].chars.some(c => c.name === name)) {
+      alert('현재 그룹에 이미 동일한 이름의 캐릭터가 있습니다.');
+      return;
+    }
+
+    // 배열에 캐릭터 추가
     groups[activeGroup].chars.push({ name, score });
-    pushCloudData();
-
+    
+    // UI 즉시 반영
     renderGroupChars();
     updateCharAssignSelect();
+
+    // Firebase 클라우드 동기화
+    pushCloudData();
 
     nameInput.value = '';
     scoreInput.value = '';
@@ -449,21 +479,22 @@
   }
 
   function removeCharFromGroup(charName) {
-    if (!activeGroup) return;
+    if (!activeGroup || !groups[activeGroup] || !groups[activeGroup].chars) return;
     groups[activeGroup].chars = groups[activeGroup].chars.filter(c => c.name !== charName);
+    
     bosses.forEach(b => {
       if (b.members) b.members = b.members.filter(m => !(m.group === activeGroup && m.name === charName));
     });
 
-    pushCloudData();
     renderGroupChars();
     updateCharAssignSelect();
     renderBosses();
+    pushCloudData();
   }
 
   function renderGroupChars() {
     const container = document.getElementById('groupCharList');
-    if (!activeGroup || !groups[activeGroup] || !groups[activeGroup].chars || groups[activeGroup].chars.length === 0) {
+    if (!activeGroup || !groups[activeGroup] || !Array.isArray(groups[activeGroup].chars) || groups[activeGroup].chars.length === 0) {
       container.innerHTML = '<span style="color:#868e96; font-size:0.85rem;">(등록된 캐릭터가 없습니다)</span>';
       return;
     }
@@ -477,7 +508,7 @@
 
   function updateCharAssignSelect() {
     const sel = document.getElementById('charToAssign');
-    if (!activeGroup || !groups[activeGroup] || !groups[activeGroup].chars || groups[activeGroup].chars.length === 0) {
+    if (!activeGroup || !groups[activeGroup] || !Array.isArray(groups[activeGroup].chars) || groups[activeGroup].chars.length === 0) {
       sel.innerHTML = '<option value="">-- 등록된 캐릭터 없음 --</option>';
       return;
     }
@@ -503,7 +534,7 @@
     if (!charName) { alert('배치할 캐릭터를 선택하세요.'); return; }
     if (!bossId) { alert('배치할 보스를 선택하세요.'); return; }
 
-    const char = groups[activeGroup].chars.find(c => c.name === charName);
+    const char = (groups[activeGroup].chars || []).find(c => c.name === charName);
     const boss = bosses.find(b => b.id === bossId);
 
     if (!char || !boss) return;
@@ -537,7 +568,7 @@
 
   function loadGroupSchedule() {
     clearScheduleUI();
-    if (!activeGroup || !groups[activeGroup] || !groups[activeGroup].schedule) return;
+    if (!activeGroup || !groups[activeGroup] || !Array.isArray(groups[activeGroup].schedule)) return;
     groups[activeGroup].schedule.forEach(key => {
       const cell = document.querySelector(`.slot-cell[data-key="${key}"]`);
       if (cell) cell.classList.add('selected');
@@ -548,7 +579,7 @@
     document.querySelectorAll('.slot-cell').forEach(c => c.classList.remove('selected'));
   }
 
-  // --- 핵심: 전수 파티 결성 및 시간표 배치 엔진 ---
+  // --- 최종 시간표 생성 엔진 ---
   function solveSchedule() {
     const resultContainer = document.getElementById('resultContainer');
     const resultDiv = document.getElementById('scheduleResults');
@@ -642,7 +673,7 @@
         let canAllJoin = true;
         for (let m of party.members) {
           const grp = groups[m.group];
-          const hasSched = grp && grp.schedule && grp.schedule.includes(slot.key);
+          const hasSched = grp && Array.isArray(grp.schedule) && grp.schedule.includes(slot.key);
           if (!hasSched || usedGroupSlots.has(`${m.group}_${slot.key}`)) {
             canAllJoin = false;
             break;
