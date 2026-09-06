@@ -206,6 +206,8 @@
   messagingSenderId: "709713584613",
   appId: "1:709713584613:web:a2d39f146c8b0b72668f0c"
   };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
   let bosses = []; 
   let groups = {}; 
   let activeGroup = null;
