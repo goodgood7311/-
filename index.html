@@ -33,12 +33,13 @@
     .badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: 500; background: #e7f5ff; color: #1971c2; border: 1px solid #a5d8ff; margin: 3px; }
     .badge-member { background: #edf2ff; color: #364fc7; border: 1px solid #bac8ff; }
 
-    .timetable-wrapper { overflow-x: auto; border: 1px solid #ced4da; border-radius: 6px; user-select: none; max-height: 400px; margin-top: 8px; }
+    /* 24시간 표시를 위해 높이 확장 및 스크롤 최적화 */
+    .timetable-wrapper { overflow-x: auto; border: 1px solid #ced4da; border-radius: 6px; user-select: none; max-height: 520px; margin-top: 8px; }
     .timetable { border-collapse: collapse; width: 100%; min-width: 600px; }
-    .timetable th, .timetable td { border: 1px solid #dee2e6; text-align: center; font-size: 0.8rem; padding: 8px 4px; }
+    .timetable th, .timetable td { border: 1px solid #dee2e6; text-align: center; font-size: 0.8rem; padding: 6px 4px; }
     .timetable th { background: #e9ecef; position: sticky; top: 0; z-index: 3; }
     .time-col { background: #f8f9fa; width: 75px; font-weight: bold; position: sticky; left: 0; z-index: 2; }
-    .slot-cell { cursor: pointer; background: #fff; height: 28px; }
+    .slot-cell { cursor: pointer; background: #fff; height: 26px; }
     .slot-cell.selected { background-color: #339af0 !important; }
 
     .highlight-box { background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 14px; margin-top: 10px; }
@@ -49,7 +50,6 @@
     .time-group-header.parallel { background: #2b8a3e; }
     .time-group-body { padding: 10px; background: #f8f9fa; display: flex; flex-direction: column; gap: 10px; }
     
-    /* 보스별 색상 박스 기본 틀 */
     .party-sub-card { 
       background: #fff; 
       border-radius: 6px; 
@@ -131,7 +131,6 @@
         <div id="groupCharList" style="margin-top: 6px; min-height: 30px;">(등록된 캐릭터가 없습니다)</div>
       </div>
 
-      <!-- 신규 기능: 파티 제외 대상 그룹 설정 -->
       <div style="margin-top: 14px; border-top: 1px dashed #dee2e6; padding-top: 10px;">
         <label style="color: #c92a2a; margin-bottom: 4px;">⛔ 같은 파티를 맺지 않을 그룹 선택 (제외 설정):</label>
         <p style="font-size: 0.8rem; color: #868e96; margin: 0 0 6px 0;">
@@ -144,11 +143,11 @@
     </div>
   </div>
 
-  <!-- 3. 주간 가능 시간대 등록 -->
+  <!-- 3. 주간 가능 시간대 등록 (00:00 ~ 24:00) -->
   <div class="card">
-    <h2>3. 선택된 그룹의 주간 가능 시간대 등록</h2>
+    <h2>3. 선택된 그룹의 주간 가능 시간대 등록 (00:00 ~ 24:00)</h2>
     <div style="display: flex; justify-content: space-between; align-items: center;">
-      <span style="font-size: 0.85rem; color: #495057;">마우스로 드래그하여 가능한 시간대를 파란색으로 활성화하세요.</span>
+      <span style="font-size: 0.85rem; color: #495057;">마우스로 드래그하여 가능한 시간대를 파란색으로 활성화하세요. (스크롤 지원)</span>
       <button type="button" class="btn btn-primary" onclick="saveCurrentGroupSchedule()">시간표 저장</button>
     </div>
 
@@ -185,8 +184,8 @@
   <div class="card">
     <h2>5. 최종 시간표 생성 및 조회/공유</h2>
     <p style="font-size: 0.85rem; color: #666; margin-top: 0;">
-      * 보스별로 고유한 색상 테두리가 적용되어 가독성이 대폭 향상되었습니다.<br>
-      * 제외 설정된 그룹 간에는 절대 한 파티로 묶이지 않습니다.
+      * 24시간 범위 내에서 공통 시간대를 찾아 최적 배정합니다.<br>
+      * 보스별 고유 색상 박스와 제외 그룹 조건이 함께 적용됩니다.
     </p>
     <button type="button" class="btn btn-success" onclick="solveSchedule()">최종 시간표 자동 생성</button>
     
@@ -232,16 +231,15 @@
   let currentScheduleData = [];
   let currentFilteredData = [];
 
-  // 보스별 고유 컬러 팔레트 (테두리색, 배경색, 배지텍스트색)
   const BOSS_COLORS = [
-    { border: "#1971c2", bg: "#f8faff", badgeBg: "#e7f5ff", badgeText: "#1971c2" }, // 블루
-    { border: "#2f9e44", bg: "#f9fdf9", badgeBg: "#ebfbee", badgeText: "#2f9e44" }, // 그린
-    { border: "#9c36b5", bg: "#fdf8ff", badgeBg: "#f3f0ff", badgeText: "#9c36b5" }, // 퍼플
-    { border: "#f76707", bg: "#fffaf6", badgeBg: "#fff4e6", badgeText: "#d9480f" }, // 오렌지
-    { border: "#e03131", bg: "#fff8f8", badgeBg: "#ffe3e3", badgeText: "#c92a2a" }, // 레드
-    { border: "#0ca678", bg: "#f6fffc", badgeBg: "#e6fcf5", badgeText: "#099268" }, // 틸
-    { border: "#f59f00", bg: "#fffdf5", badgeBg: "#fff9db", badgeText: "#e67700" }, // 옐로우
-    { border: "#495057", bg: "#fcfcfd", badgeBg: "#f1f3f5", badgeText: "#343a40" }  // 그레이
+    { border: "#1971c2", bg: "#f8faff", badgeBg: "#e7f5ff", badgeText: "#1971c2" },
+    { border: "#2f9e44", bg: "#f9fdf9", badgeBg: "#ebfbee", badgeText: "#2f9e44" },
+    { border: "#9c36b5", bg: "#fdf8ff", badgeBg: "#f3f0ff", badgeText: "#9c36b5" },
+    { border: "#f76707", bg: "#fffaf6", badgeBg: "#fff4e6", badgeText: "#d9480f" },
+    { border: "#e03131", bg: "#fff8f8", badgeBg: "#ffe3e3", badgeText: "#c92a2a" },
+    { border: "#0ca678", bg: "#f6fffc", badgeBg: "#e6fcf5", badgeText: "#099268" },
+    { border: "#f59f00", bg: "#fffdf5", badgeBg: "#fff9db", badgeText: "#e67700" },
+    { border: "#495057", bg: "#fcfcfd", badgeBg: "#f1f3f5", badgeText: "#343a40" }
   ];
 
   function getBossColor(bossName) {
@@ -254,14 +252,15 @@
   }
 
   const days = ['목', '금', '토', '일', '월', '화', '수'];
+  
+  // 00:00부터 23:40까지 24시간 20분 단위 슬롯 생성 (총 72칸)
   const timeSlots = [];
-  for (let h = 18; h < 24; h++) {
+  for (let h = 0; h < 24; h++) {
     for (let m = 0; m < 60; m += 20) {
       timeSlots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
     }
   }
 
-  // Firebase 실시간 클라우드 전송
   function pushCloudData() {
     if (db) {
       db.ref('raid_data').set({
@@ -274,7 +273,6 @@
     }
   }
 
-  // Firebase 실시간 수신 리스너
   function listenDatabase() {  
     if (!db) return;
     db.ref('raid_data').on('value', (snapshot) => {
@@ -310,7 +308,6 @@
     });
   }
 
-  // --- 시간표 드래그 UI ---
   let isMouseDown = false;
   let targetSelectionMode = true;
 
@@ -354,7 +351,6 @@
     else cell.classList.remove('selected');
   }
 
-  // --- 보스 관리 ---
   function addBoss() {
     const name = document.getElementById('bossName').value.trim();
     const score = parseFloat(document.getElementById('bossTargetScore').value);
@@ -420,7 +416,6 @@
     }
   }
 
-  // --- 그룹 및 캐릭터 관리 ---
   function createNewGroup() {
     const nameInput = document.getElementById('newGroupName');
     const name = nameInput.value.trim();
@@ -482,7 +477,6 @@
     renderExcludeCheckboxes();
   }
 
-  // 그룹 제외(블랙리스트) 체크박스 렌더링
   function renderExcludeCheckboxes() {
     const area = document.getElementById('excludeGroupCheckboxArea');
     if (!activeGroup || !groups[activeGroup]) {
@@ -670,7 +664,6 @@
     document.querySelectorAll('.slot-cell').forEach(c => c.classList.remove('selected'));
   }
 
-  // 상호 그룹 제외 검사 헬퍼
   function canGroupsCoexist(g1, g2) {
     if (g1 === g2) return false;
     const ex1 = (groups[g1] && groups[g1].excludes) || [];
@@ -679,7 +672,6 @@
     return true;
   }
 
-  // --- 최종 시간표 생성 엔진 (제외 그룹 반영 & 보스 컬러링) ---
   function solveSchedule() {
     const resultContainer = document.getElementById('resultContainer');
     const resultDiv = document.getElementById('scheduleResults');
@@ -705,7 +697,6 @@
 
         let bestParty = null;
 
-        // 가능한 조합 중 '제외 그룹 설정'을 위반하지 않는 파티만 선별
         function formParty(groupStart, currentList) {
           const currentSum = currentList.reduce((acc, m) => acc + m.score, 0);
           
@@ -720,7 +711,6 @@
           for (let i = groupStart; i < distinctGroups.length; i++) {
             const candidateGroup = distinctGroups[i];
 
-            // 기존에 파티에 들어간 멤버들과 상호 제외 조건 검사
             let conflict = false;
             for (let member of currentList) {
               if (!canGroupsCoexist(member.group, candidateGroup)) {
@@ -728,7 +718,7 @@
                 break;
               }
             }
-            if (conflict) continue; // 제외 설정으로 인해 같은 파티 불가
+            if (conflict) continue;
 
             const candidateChar = byGroup[candidateGroup][0];
             currentList.push(candidateChar);
@@ -852,7 +842,6 @@
       Array.from(groupSet).map(g => `<option value="${g}">${g} 그룹 시간표만 보기</option>`).join('');
   }
 
-  // 결과 화면 렌더링 (보스별 컬러링 박스 적용)
   function applyGroupFilter(selectedGroup) {
     const resultDiv = document.getElementById('scheduleResults');
     resultDiv.innerHTML = '';
