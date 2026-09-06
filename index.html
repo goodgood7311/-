@@ -27,8 +27,6 @@
     .btn-share-kakao { background: #fee500; color: #000; border: 1px solid #e5cf00; padding: 8px 14px; font-size: 0.9rem; }
     .btn-share-kakao:hover { background: #fada0a; }
     .btn-share-img { background: #495057; color: white; padding: 8px 14px; font-size: 0.9rem; }
-    .btn-cloud { background: #7950f2; color: white; }
-    .btn-cloud:hover { background: #6741d9; }
 
     .boss-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; margin-top: 10px; }
     .boss-item { border: 1px solid #ced4da; border-radius: 8px; padding: 12px; background: #f8f9fa; }
@@ -57,20 +55,17 @@
 
 <div class="container">
 
-  <!-- 0. 실시간 클라우드 동기화 -->
-  <div class="card" style="background: #f3f0ff; border: 1px solid #d0bfff;">
+  <!-- 0. Firebase 실시간 클라우드 동기화 상태 바 -->
+  <div class="card" style="background: #ebfbee; border: 1px solid #8ce99a;">
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
       <div>
-        <strong style="color: #5f3dc4; font-size: 1.05rem;">☁️ 실시간 클라우드 방 동기화</strong>
-        <span id="syncStatus" style="font-size: 0.85rem; font-weight: bold; color: #7048e8; margin-left: 8px;">(오프라인 모드)</span>
-        <p style="font-size: 0.8rem; color: #7048e8; margin: 4px 0 0 0;">
-          동일한 <b>방 이름</b>을 공유하여 참여자들이 동시에 입력하고 시간표를 맞춥니다.
+        <strong style="color: #2b8a3e; font-size: 1.05rem;">🟢 Firebase 중앙 클라우드 실시간 연동 중</strong>
+        <p style="font-size: 0.8rem; color: #2b8a3e; margin: 4px 0 0 0;">
+          누군가 캐릭터나 시간을 등록하면 이 링크로 접속한 모든 사람에게 <b>실시간으로 자동 반영</b>됩니다.
         </p>
       </div>
-      <div style="display: flex; gap: 6px; align-items: center;">
-        <input type="text" id="roomNameInput" placeholder="방이름 (예: raid1)" style="padding: 8px 10px; width: 140px;">
-        <button type="button" class="btn btn-cloud" onclick="joinRoom()">방 접속/생성</button>
-        <button type="button" class="btn btn-primary" onclick="pullCloudData(true)">🔄 실시간 동기화</button>
+      <div id="syncStatus" style="font-size: 0.85rem; font-weight: bold; color: #2b8a3e;">
+        (실시간 대기 중 🟢)
       </div>
     </div>
   </div>
@@ -198,22 +193,24 @@
 
 <script>
   const firebaseConfig = {
-  apiKey: "AIzaSyD-1hsah5m-vjuc9zTVt8Xl7WTaY1PrViw",
-  authDomain: "bosstime2.firebaseapp.com",
-  databaseURL: "https://bosstime2-default-rtdb.firebaseio.com",
-  projectId: "bosstime2",
-  storageBucket: "bosstime2.firebasestorage.app",
-  messagingSenderId: "709713584613",
-  appId: "1:709713584613:web:a2d39f146c8b0b72668f0c"
+    apiKey: "AIzaSyD-1hsah5m-vjuc9zTVt8Xl7WTaY1PrViw",
+    authDomain: "bosstime2.firebaseapp.com",
+    databaseURL: "https://bosstime2-default-rtdb.firebaseio.com",
+    projectId: "bosstime2",
+    storageBucket: "bosstime2.firebasestorage.app",
+    messagingSenderId: "709713584613",
+    appId: "1:709713584613:web:a2d39f146c8b0b72668f0c"
   };
+
+  // Firebase 초기화 및 Realtime Database 연결
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
+
   let bosses = []; 
   let groups = {}; 
   let activeGroup = null;
   let currentScheduleData = [];
   let currentFilteredData = [];
-  let currentRoom = localStorage.getItem('raid_room_name') || '';
 
   const days = ['목', '금', '토', '일', '월', '화', '수'];
   const timeSlots = [];
@@ -236,6 +233,7 @@
     }
   }
 
+  // Firebase 실시간 리스너
   function listenDatabase() {  
     if (!db) return;
     db.ref('raid_data').on('value', (snapshot) => {
@@ -332,6 +330,7 @@
   function renderBosses() {
     const container = document.getElementById('bossContainer');
     container.innerHTML = bosses.map(b => {
+      const currentList = b.members || [];
       return `
         <div class="boss-item">
           <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -342,9 +341,9 @@
             조건: 요구 합산 ${b.targetScore} 이상 / 파티당 최대 ${b.count}명
           </div>
           <div style="margin-top:6px; border-top: 1px dashed #dee2e6; padding-top: 6px;">
-            <div style="font-size:0.75rem; color:#868e96; margin-bottom:3px;">등록된 캐릭터 풀 (총 ${b.members.length}개):</div>
-            ${b.members.length === 0 ? '<span style="font-size:0.75rem; color:#adb5bd;">(등록된 캐릭터 없음)</span>' : ''}
-            ${b.members.map((m, idx) => `
+            <div style="font-size:0.75rem; color:#868e96; margin-bottom:3px;">등록된 캐릭터 풀 (총 ${currentList.length}개):</div>
+            ${currentList.length === 0 ? '<span style="font-size:0.75rem; color:#adb5bd;">(등록된 캐릭터 없음)</span>' : ''}
+            ${currentList.map((m, idx) => `
               <span class="badge badge-member">
                 <b>[${m.group}]</b> ${m.name}(${m.score})
                 <a href="javascript:void(0)" onclick="removeMemberFromBoss('${b.id}', ${idx})" style="color:#fa5252; text-decoration:none; margin-left:4px; font-weight:bold;">×</a>
@@ -358,7 +357,7 @@
 
   function removeMemberFromBoss(bossId, index) {
     const boss = bosses.find(b => b.id === bossId);
-    if (boss) {
+    if (boss && boss.members) {
       boss.members.splice(index, 1);
       pushCloudData();
       renderBosses();
@@ -415,7 +414,7 @@
     if (!confirm(`[${activeGroup}] 그룹을 정말 삭제하시겠습니까?`)) return;
 
     bosses.forEach(b => {
-      b.members = b.members.filter(m => m.group !== activeGroup);
+      if (b.members) b.members = b.members.filter(m => m.group !== activeGroup);
     });
 
     delete groups[activeGroup];
@@ -453,7 +452,7 @@
     if (!activeGroup) return;
     groups[activeGroup].chars = groups[activeGroup].chars.filter(c => c.name !== charName);
     bosses.forEach(b => {
-      b.members = b.members.filter(m => !(m.group === activeGroup && m.name === charName));
+      if (b.members) b.members = b.members.filter(m => !(m.group === activeGroup && m.name === charName));
     });
 
     pushCloudData();
@@ -508,13 +507,13 @@
     const boss = bosses.find(b => b.id === bossId);
 
     if (!char || !boss) return;
+    if (!boss.members) boss.members = [];
 
     if (boss.members.some(m => m.group === activeGroup && m.name === charName)) {
       alert(`[${boss.name}] 보스 풀에 이미 [${charName}] 캐릭터가 들어가 있습니다.`);
       return;
     }
 
-    // 각 캐릭터를 고유 ID와 함께 풀에 등록
     boss.members.push({ 
       charId: `${activeGroup}_${char.name}_${Date.now()}`,
       group: activeGroup, 
@@ -549,23 +548,21 @@
     document.querySelectorAll('.slot-cell').forEach(c => c.classList.remove('selected'));
   }
 
-  // --- 핵심: 모든 캐릭터 전수 파티 결성 및 시간표 완전 배치 엔진 ---
+  // --- 핵심: 전수 파티 결성 및 시간표 배치 엔진 ---
   function solveSchedule() {
     const resultContainer = document.getElementById('resultContainer');
     const resultDiv = document.getElementById('scheduleResults');
     resultDiv.innerHTML = '';
     currentScheduleData = [];
 
-    // 1. 보스별 파티 전수 결성 (풀에 남은 캐릭터가 없을 때까지 무한 반복)
     const partyUnits = [];
     const unassignedChars = [];
 
     bosses.forEach(boss => {
-      let pool = [...boss.members];
+      let pool = [...(boss.members || [])];
       let pIdx = 1;
 
       while (pool.length > 0) {
-        // 남은 풀에서 그룹별 캐릭터 목록 구성
         const byGroup = {};
         pool.forEach(m => {
           if (!byGroup[m.group]) byGroup[m.group] = [];
@@ -577,7 +574,6 @@
 
         let bestParty = null;
 
-        // 가능한 모든 그룹 조합을 점검하여 파티 결성 (그리디: 목표치 넘는 최소 인원 또는 최대 조합)
         function formParty(groupStart, currentList) {
           const currentSum = currentList.reduce((acc, m) => acc + m.score, 0);
           
@@ -591,7 +587,7 @@
 
           for (let i = groupStart; i < distinctGroups.length; i++) {
             const g = distinctGroups[i];
-            const candidateChar = byGroup[g][0]; // 해당 그룹의 첫 번째 캐릭터
+            const candidateChar = byGroup[g][0];
             currentList.push(candidateChar);
             formParty(i + 1, currentList);
             currentList.pop();
@@ -608,13 +604,11 @@
             partyNumber: pIdx++
           });
 
-          // 결성된 캐릭터를 pool에서 정확히 1개씩 제거
           bestParty.forEach(selected => {
             const idx = pool.findIndex(m => m.group === selected.group && m.name === selected.name);
             if (idx !== -1) pool.splice(idx, 1);
           });
         } else {
-          // 더 이상 목표치를 넘길 수 있는 그룹 조합이 없으면 남은 캐릭터들은 미배정 목록으로 이동
           pool.forEach(rem => unassignedChars.push({ bossName: boss.name, ...rem }));
           break;
         }
@@ -627,7 +621,6 @@
       return;
     }
 
-    // 2. 시간 슬롯 생성
     const allSlots = [];
     days.forEach((_, dIdx) => {
       timeSlots.forEach((slot, sIdx) => {
@@ -635,10 +628,9 @@
       });
     });
 
-    // 3. 시간표 배치 (동일 인물만 충돌 차단, 다른 그룹은 동일 시간대 다중 진행 우선 배치)
     const finalAssignments = [];
-    const usedGroupSlots = new Set(); // `${group}_${slotKey}`
-    const slotPartyCount = {}; // 슬롯별 파티 개수
+    const usedGroupSlots = new Set();
+    const slotPartyCount = {};
 
     for (let party of partyUnits) {
       let chosenSlot = null;
@@ -647,7 +639,6 @@
       for (let s = 0; s < allSlots.length; s++) {
         const slot = allSlots[s];
 
-        // 파티원 전원이 해당 슬롯에 가능한지 검증
         let canAllJoin = true;
         for (let m of party.members) {
           const grp = groups[m.group];
@@ -660,7 +651,6 @@
 
         if (canAllJoin) {
           let score = 0;
-          // 다른 파티가 이미 진행 중인 시간대라면 동시 진행(병렬) 강력 가산점
           const currentCount = slotPartyCount[slot.key] || 0;
           if (currentCount > 0) {
             score += 2000 * currentCount;
@@ -674,12 +664,10 @@
       }
 
       if (!chosenSlot) {
-        // 공통 시간대가 안 맞아서 탈락한 경우
         party.members.forEach(m => unassignedChars.push({ bossName: party.bossName, reason: '시간대 불일치', ...m }));
         continue;
       }
 
-      // 슬롯 확정 등록
       party.members.forEach(m => {
         usedGroupSlots.add(`${m.group}_${chosenSlot.key}`);
       });
@@ -697,7 +685,6 @@
     populateFilterDropdown();
     applyGroupFilter('ALL');
 
-    // 미배정 캐릭터가 있다면 하단에 안내 렌더링
     if (unassignedChars.length > 0) {
       let unassignedHtml = `
         <div style="background:#fff5f5; border:1px solid #ffc9c9; border-radius:8px; padding:12px; margin-top:14px;">
@@ -713,7 +700,6 @@
     resultContainer.style.display = 'block';
   }
 
-  // --- 필터 드롭다운 및 렌더링 ---
   function populateFilterDropdown() {
     const sel = document.getElementById('filterGroupSelect');
     const groupSet = new Set();
@@ -742,7 +728,6 @@
       return;
     }
 
-    // 시간대별 그룹핑
     const byTime = {};
     currentFilteredData.forEach(item => {
       const key = `${days[item.slot.dayIdx]}요일 ${item.slot.time}`;
@@ -826,7 +811,7 @@
     });
   }
 
-    window.onload = () => {
+  window.onload = () => {
     initTimetable();
     listenDatabase();
   };
