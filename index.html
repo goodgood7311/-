@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>주간 레이드 시간표 자동 조율기</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <style>
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { padding: 16px; background-color: #f1f3f5; margin: 0; color: #212529; }
@@ -195,6 +197,15 @@
 </div>
 
 <script>
+  const firebaseConfig = {
+  apiKey: "AIzaSyD-1hsah5m-vjuc9zTVt8Xl7WTaY1PrViw",
+  authDomain: "bosstime2.firebaseapp.com",
+  databaseURL: "https://bosstime2-default-rtdb.firebaseio.com",
+  projectId: "bosstime2",
+  storageBucket: "bosstime2.firebasestorage.app",
+  messagingSenderId: "709713584613",
+  appId: "1:709713584613:web:a2d39f146c8b0b72668f0c"
+  };
   let bosses = []; 
   let groups = {}; 
   let activeGroup = null;
@@ -210,63 +221,38 @@
     }
   }
 
-  // --- 클라우드 동기화 헬퍼 ---
-  function getStorageKey(room) {
-    return 'raid_room_' + encodeURIComponent(room.trim().toLowerCase());
-  }
-
-  async function pushCloudData() {
-    saveLocalData();
-    if (!currentRoom) return;
-    const key = getStorageKey(currentRoom);
-    const payload = JSON.stringify({ bosses, groups, updated: Date.now() });
-    localStorage.setItem(key, payload);
-    document.getElementById('syncStatus').innerText = `(방 [${currentRoom}] 저장 완료)`;
-  }
-
-  async function pullCloudData(alertOnSuccess = false) {
-    if (!currentRoom) return;
-    const key = getStorageKey(currentRoom);
-    const saved = localStorage.getItem(key);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.bosses && parsed.groups) {
-          bosses = parsed.bosses;
-          groups = parsed.groups;
-          saveLocalData();
-          renderBosses();
-          updateGroupDropdown();
-          updateBossAssignSelect();
-          if (activeGroup && groups[activeGroup]) switchGroup(activeGroup);
-          document.getElementById('syncStatus').innerText = `(방 [${currentRoom}] 동기화 완료 ✅)`;
-          if (alertOnSuccess) alert(`[${currentRoom}] 방의 데이터를 동기화했습니다!`);
-          return;
-        }
-      } catch (e) {}
+  // 데이터를 Firebase 클라우드에 즉시 저장
+  function pushCloudData() {
+    if (db) {
+      db.ref('raid_data').set({
+        bosses: bosses,
+        groups: groups,
+        updatedAt: Date.now()
+      });
+      const status = document.getElementById('syncStatus');
+      if (status) status.innerText = '(클라우드 실시간 동기화됨 ✅)';
     }
-    document.getElementById('syncStatus').innerText = `(방 [${currentRoom}] 연결됨)`;
-    if (alertOnSuccess) alert(`[${currentRoom}] 방에 연결되었습니다.`);
   }
 
-  function joinRoom() {
-    const input = document.getElementById('roomNameInput').value.trim();
-    if (!input) { alert('방 이름을 입력하세요.'); return; }
-    currentRoom = input;
-    localStorage.setItem('raid_room_name', currentRoom);
-    pullCloudData(true);
-  }
-
-  function saveLocalData() {
-    localStorage.setItem('raid_bosses', JSON.stringify(bosses));
-    localStorage.setItem('raid_groups', JSON.stringify(groups));
-  }
-
-  function loadLocalData() {
-    const b = localStorage.getItem('raid_bosses');
-    const g = localStorage.getItem('raid_groups');
-    if (b) bosses = JSON.parse(b);
-    if (g) groups = JSON.parse(g);
+  function listenDatabase() {  
+    if (!db) return;
+    db.ref('raid_data').on('value', (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        bosses = data.bosses || [];
+        groups = data.groups || {};
+        renderBosses();
+        updateGroupDropdown();
+        updateBossAssignSelect();
+        if (activeGroup && groups[activeGroup]) {
+          renderGroupChars();
+          loadGroupSchedule();
+          updateCharAssignSelect();
+        }
+        const status = document.getElementById('syncStatus');
+        if (status) status.innerText = '(실시간 연동 중 🟢)';
+      }
+    });
   }
 
   // --- 시간표 드래그 UI ---
@@ -838,17 +824,9 @@
     });
   }
 
-  window.onload = () => {
-    loadLocalData();
+    window.onload = () => {
     initTimetable();
-    renderBosses();
-    updateGroupDropdown();
-    updateBossAssignSelect();
-
-    if (currentRoom) {
-      document.getElementById('roomNameInput').value = currentRoom;
-      pullCloudData(false);
-    }
+    listenDatabase();
   };
 </script>
 </body>
