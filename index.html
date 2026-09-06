@@ -47,8 +47,18 @@
     .time-group-card { border: 1px solid #ced4da; border-radius: 8px; margin-bottom: 14px; overflow: hidden; }
     .time-group-header { background: #1864ab; color: #fff; padding: 10px 14px; font-weight: bold; font-size: 1rem; }
     .time-group-header.parallel { background: #2b8a3e; }
-    .time-group-body { padding: 10px; background: #f8f9fa; display: flex; flex-direction: column; gap: 8px; }
-    .party-sub-card { background: #fff; border: 1px solid #a5d8ff; border-left: 4px solid #339af0; padding: 12px; border-radius: 4px; }
+    .time-group-body { padding: 10px; background: #f8f9fa; display: flex; flex-direction: column; gap: 10px; }
+    
+    /* 보스별 색상 박스 기본 틀 */
+    .party-sub-card { 
+      background: #fff; 
+      border-radius: 6px; 
+      padding: 12px; 
+      border-left: 6px solid #228be6; 
+      border-top: 1px solid #dee2e6;
+      border-right: 1px solid #dee2e6;
+      border-bottom: 1px solid #dee2e6;
+    }
   </style>
 </head>
 <body>
@@ -70,7 +80,7 @@
     </div>
   </div>
 
-  <!-- 1. 보스 약속 설정 및 참여 현황 -->
+  <!-- 1. 보스 약속 설정 및 참여 희망 풀 -->
   <div class="card">
     <h2>1. 보스 약속 설정 및 참여 희망 풀</h2>
     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
@@ -120,6 +130,17 @@
         <span style="font-size: 0.85rem; font-weight: bold; color: #495057;">내 그룹 등록 캐릭터 목록:</span>
         <div id="groupCharList" style="margin-top: 6px; min-height: 30px;">(등록된 캐릭터가 없습니다)</div>
       </div>
+
+      <!-- 신규 기능: 파티 제외 대상 그룹 설정 -->
+      <div style="margin-top: 14px; border-top: 1px dashed #dee2e6; padding-top: 10px;">
+        <label style="color: #c92a2a; margin-bottom: 4px;">⛔ 같은 파티를 맺지 않을 그룹 선택 (제외 설정):</label>
+        <p style="font-size: 0.8rem; color: #868e96; margin: 0 0 6px 0;">
+          체크된 그룹과는 시간표 매칭 시 같은 파티로 묶이지 않습니다.
+        </p>
+        <div id="excludeGroupCheckboxArea" style="display: flex; flex-wrap: wrap; gap: 10px; font-size: 0.85rem;">
+          (그룹을 선택하면 목록이 표시됩니다)
+        </div>
+      </div>
     </div>
   </div>
 
@@ -164,8 +185,8 @@
   <div class="card">
     <h2>5. 최종 시간표 생성 및 조회/공유</h2>
     <p style="font-size: 0.85rem; color: #666; margin-top: 0;">
-      * 보스 풀에 투입된 모든 그룹의 모든 캐릭터를 끝까지 파티로 결성하여 시간표에 배치합니다.<br>
-      * 동일 시간대에 서로 다른 파티가 동시에 출발할 수 있습니다.
+      * 보스별로 고유한 색상 테두리가 적용되어 가독성이 대폭 향상되었습니다.<br>
+      * 제외 설정된 그룹 간에는 절대 한 파티로 묶이지 않습니다.
     </p>
     <button type="button" class="btn btn-success" onclick="solveSchedule()">최종 시간표 자동 생성</button>
     
@@ -211,6 +232,27 @@
   let currentScheduleData = [];
   let currentFilteredData = [];
 
+  // 보스별 고유 컬러 팔레트 (테두리색, 배경색, 배지텍스트색)
+  const BOSS_COLORS = [
+    { border: "#1971c2", bg: "#f8faff", badgeBg: "#e7f5ff", badgeText: "#1971c2" }, // 블루
+    { border: "#2f9e44", bg: "#f9fdf9", badgeBg: "#ebfbee", badgeText: "#2f9e44" }, // 그린
+    { border: "#9c36b5", bg: "#fdf8ff", badgeBg: "#f3f0ff", badgeText: "#9c36b5" }, // 퍼플
+    { border: "#f76707", bg: "#fffaf6", badgeBg: "#fff4e6", badgeText: "#d9480f" }, // 오렌지
+    { border: "#e03131", bg: "#fff8f8", badgeBg: "#ffe3e3", badgeText: "#c92a2a" }, // 레드
+    { border: "#0ca678", bg: "#f6fffc", badgeBg: "#e6fcf5", badgeText: "#099268" }, // 틸
+    { border: "#f59f00", bg: "#fffdf5", badgeBg: "#fff9db", badgeText: "#e67700" }, // 옐로우
+    { border: "#495057", bg: "#fcfcfd", badgeBg: "#f1f3f5", badgeText: "#343a40" }  // 그레이
+  ];
+
+  function getBossColor(bossName) {
+    let hash = 0;
+    for (let i = 0; i < bossName.length; i++) {
+      hash = bossName.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const idx = Math.abs(hash) % BOSS_COLORS.length;
+    return BOSS_COLORS[idx];
+  }
+
   const days = ['목', '금', '토', '일', '월', '화', '수'];
   const timeSlots = [];
   for (let h = 18; h < 24; h++) {
@@ -241,11 +283,11 @@
         bosses = data.bosses || [];
         groups = data.groups || {};
 
-        // 빈 배열 누락 방지 안전 보정
         Object.keys(groups).forEach(gName => {
-          if (!groups[gName]) groups[gName] = { chars: [], schedule: [] };
+          if (!groups[gName]) groups[gName] = { chars: [], schedule: [], excludes: [] };
           if (!Array.isArray(groups[gName].chars)) groups[gName].chars = [];
           if (!Array.isArray(groups[gName].schedule)) groups[gName].schedule = [];
+          if (!Array.isArray(groups[gName].excludes)) groups[gName].excludes = [];
         });
         bosses.forEach(b => {
           if (!b.members) b.members = [];
@@ -259,6 +301,7 @@
           renderGroupChars();
           loadGroupSchedule();
           updateCharAssignSelect();
+          renderExcludeCheckboxes();
         }
 
         const status = document.getElementById('syncStatus');
@@ -343,10 +386,11 @@
     const container = document.getElementById('bossContainer');
     container.innerHTML = bosses.map(b => {
       const currentList = b.members || [];
+      const color = getBossColor(b.name);
       return `
-        <div class="boss-item">
+        <div class="boss-item" style="border-top: 4px solid ${color.border};">
           <div style="display:flex; justify-content:space-between; align-items:center;">
-            <strong>${b.name}</strong>
+            <strong style="color: ${color.border}; font-size: 1.05rem;">${b.name}</strong>
             <button type="button" class="btn btn-danger" onclick="removeBoss('${b.id}')">삭제</button>
           </div>
           <div style="font-size:0.8rem; color:#495057; margin: 4px 0;">
@@ -376,30 +420,23 @@
     }
   }
 
-  // --- 그룹 및 캐릭터 관리 (두 번째 그룹 생성 오류 해결) ---
+  // --- 그룹 및 캐릭터 관리 ---
   function createNewGroup() {
     const nameInput = document.getElementById('newGroupName');
     const name = nameInput.value.trim();
     if (!name) { alert('그룹명을 입력하세요.'); return; }
     
-    if (!groups || typeof groups !== 'object') {
-      groups = {};
-    }
-
+    if (!groups || typeof groups !== 'object') groups = {};
     if (Object.prototype.hasOwnProperty.call(groups, name)) {
-      alert('이미 존재하는 그룹명입니다. 다른 이름을 사용해주세요.');
+      alert('이미 존재하는 그룹명입니다.');
       return;
     }
 
-    // 그룹 객체 생성
-    groups[name] = { chars: [], schedule: [] };
+    groups[name] = { chars: [], schedule: [], excludes: [] };
     nameInput.value = '';
     
-    // UI 및 드롭다운 즉시 갱신 후 선택
     updateGroupDropdown();
     switchGroup(name);
-    
-    // Firebase 클라우드 동기화
     pushCloudData();
   }
 
@@ -427,11 +464,13 @@
       clearScheduleUI();
       renderGroupChars();
       updateCharAssignSelect();
+      renderExcludeCheckboxes();
       return;
     }
 
     if (!groups[activeGroup].chars) groups[activeGroup].chars = [];
     if (!groups[activeGroup].schedule) groups[activeGroup].schedule = [];
+    if (!groups[activeGroup].excludes) groups[activeGroup].excludes = [];
 
     select.value = activeGroup;
     display.innerText = `현재 선택된 그룹: [${activeGroup}]`;
@@ -440,6 +479,48 @@
     loadGroupSchedule();
     updateCharAssignSelect();
     updateBossAssignSelect();
+    renderExcludeCheckboxes();
+  }
+
+  // 그룹 제외(블랙리스트) 체크박스 렌더링
+  function renderExcludeCheckboxes() {
+    const area = document.getElementById('excludeGroupCheckboxArea');
+    if (!activeGroup || !groups[activeGroup]) {
+      area.innerHTML = '<span style="color:#868e96;">(그룹을 먼저 선택하세요)</span>';
+      return;
+    }
+
+    const otherGroups = Object.keys(groups).filter(g => g !== activeGroup);
+    if (otherGroups.length === 0) {
+      area.innerHTML = '<span style="color:#868e96;">(비교할 다른 그룹이 아직 없습니다)</span>';
+      return;
+    }
+
+    const currentExcludes = groups[activeGroup].excludes || [];
+
+    area.innerHTML = otherGroups.map(targetG => {
+      const isChecked = currentExcludes.includes(targetG) ? 'checked' : '';
+      return `
+        <label style="font-weight:normal; display:inline-flex; align-items:center; gap:4px; margin:0; cursor:pointer; background:#fff; padding:4px 8px; border:1px solid #ced4da; border-radius:4px;">
+          <input type="checkbox" ${isChecked} onchange="toggleExcludeGroup('${targetG}', this.checked)">
+          <span>[${targetG}] 그룹 제외</span>
+        </label>
+      `;
+    }).join('');
+  }
+
+  function toggleExcludeGroup(targetG, shouldExclude) {
+    if (!activeGroup || !groups[activeGroup]) return;
+    if (!groups[activeGroup].excludes) groups[activeGroup].excludes = [];
+
+    if (shouldExclude) {
+      if (!groups[activeGroup].excludes.includes(targetG)) {
+        groups[activeGroup].excludes.push(targetG);
+      }
+    } else {
+      groups[activeGroup].excludes = groups[activeGroup].excludes.filter(g => g !== targetG);
+    }
+    pushCloudData();
   }
 
   function deleteCurrentGroup() {
@@ -451,7 +532,6 @@
     });
 
     delete groups[activeGroup];
-    const prevDeleted = activeGroup;
     activeGroup = null;
     
     updateGroupDropdown();
@@ -470,12 +550,8 @@
 
     if (!name || isNaN(score)) { alert('캐릭터명과 올바른 수치(숫자)를 입력하세요.'); return; }
     
-    if (!groups[activeGroup]) {
-      groups[activeGroup] = { chars: [], schedule: [] };
-    }
-    if (!Array.isArray(groups[activeGroup].chars)) {
-      groups[activeGroup].chars = [];
-    }
+    if (!groups[activeGroup]) groups[activeGroup] = { chars: [], schedule: [], excludes: [] };
+    if (!Array.isArray(groups[activeGroup].chars)) groups[activeGroup].chars = [];
 
     if (groups[activeGroup].chars.some(c => c.name === name)) {
       alert('현재 그룹에 이미 동일한 이름의 캐릭터가 있습니다.');
@@ -483,7 +559,6 @@
     }
 
     groups[activeGroup].chars.push({ name, score });
-    
     renderGroupChars();
     updateCharAssignSelect();
     pushCloudData();
@@ -595,7 +670,16 @@
     document.querySelectorAll('.slot-cell').forEach(c => c.classList.remove('selected'));
   }
 
-  // --- 최종 시간표 생성 엔진 ---
+  // 상호 그룹 제외 검사 헬퍼
+  function canGroupsCoexist(g1, g2) {
+    if (g1 === g2) return false;
+    const ex1 = (groups[g1] && groups[g1].excludes) || [];
+    const ex2 = (groups[g2] && groups[g2].excludes) || [];
+    if (ex1.includes(g2) || ex2.includes(g1)) return false;
+    return true;
+  }
+
+  // --- 최종 시간표 생성 엔진 (제외 그룹 반영 & 보스 컬러링) ---
   function solveSchedule() {
     const resultContainer = document.getElementById('resultContainer');
     const resultDiv = document.getElementById('scheduleResults');
@@ -621,6 +705,7 @@
 
         let bestParty = null;
 
+        // 가능한 조합 중 '제외 그룹 설정'을 위반하지 않는 파티만 선별
         function formParty(groupStart, currentList) {
           const currentSum = currentList.reduce((acc, m) => acc + m.score, 0);
           
@@ -633,8 +718,19 @@
           if (currentList.length >= boss.count) return;
 
           for (let i = groupStart; i < distinctGroups.length; i++) {
-            const g = distinctGroups[i];
-            const candidateChar = byGroup[g][0];
+            const candidateGroup = distinctGroups[i];
+
+            // 기존에 파티에 들어간 멤버들과 상호 제외 조건 검사
+            let conflict = false;
+            for (let member of currentList) {
+              if (!canGroupsCoexist(member.group, candidateGroup)) {
+                conflict = true;
+                break;
+              }
+            }
+            if (conflict) continue; // 제외 설정으로 인해 같은 파티 불가
+
+            const candidateChar = byGroup[candidateGroup][0];
             currentList.push(candidateChar);
             formParty(i + 1, currentList);
             currentList.pop();
@@ -664,7 +760,7 @@
 
     if (partyUnits.length === 0) {
       resultContainer.style.display = 'block';
-      resultDiv.innerHTML = '<p style="color:#fa5252; text-align:center;">출발 가능한 파티를 구성하지 못했습니다. 등록된 캐릭터들의 수치 합이 목표치 이상인지 확인해주세요.</p>';
+      resultDiv.innerHTML = '<p style="color:#fa5252; text-align:center;">출발 가능한 파티를 구성하지 못했습니다. 스펙 합산 또는 그룹 제외 설정을 확인해주세요.</p>';
       return;
     }
 
@@ -699,9 +795,7 @@
         if (canAllJoin) {
           let score = 0;
           const currentCount = slotPartyCount[slot.key] || 0;
-          if (currentCount > 0) {
-            score += 2000 * currentCount;
-          }
+          if (currentCount > 0) score += 2000 * currentCount;
 
           if (score > highestScore) {
             highestScore = score;
@@ -737,7 +831,7 @@
         <div style="background:#fff5f5; border:1px solid #ffc9c9; border-radius:8px; padding:12px; margin-top:14px;">
           <strong style="color:#e03131;">⚠️ 시간표에 포함되지 못한 잔여 캐릭터 (${unassignedChars.length}개):</strong>
           <div style="margin-top:6px; font-size:0.85rem; color:#495057;">
-            ${unassignedChars.map(c => `[${c.bossName}] <b>${c.group}</b>의 ${c.name}(${c.score}) ${c.reason ? `(${c.reason})` : '(스펙 부족 또는 파티 짝 없음)'}`).join('<br>')}
+            ${unassignedChars.map(c => `[${c.bossName}] <b>${c.group}</b>의 ${c.name}(${c.score}) ${c.reason ? `(${c.reason})` : '(스펙 부족 또는 파티 짝 없음/그룹 제외 조건)'}`).join('<br>')}
           </div>
         </div>
       `;
@@ -758,6 +852,7 @@
       Array.from(groupSet).map(g => `<option value="${g}">${g} 그룹 시간표만 보기</option>`).join('');
   }
 
+  // 결과 화면 렌더링 (보스별 컬러링 박스 적용)
   function applyGroupFilter(selectedGroup) {
     const resultDiv = document.getElementById('scheduleResults');
     resultDiv.innerHTML = '';
@@ -788,18 +883,25 @@
 
       let subCardsHtml = partyList.map(item => {
         const sum = item.party.members.reduce((acc, m) => acc + m.score, 0).toFixed(1);
+        const color = getBossColor(item.party.bossName);
+
         const membersText = item.party.members.map(m => {
           const isHighlight = m.group === selectedGroup;
           return `<span style="${isHighlight ? 'background:#ffec99; padding:2px 5px; border-radius:3px; font-weight:bold;' : ''}"><b>[${m.group}]</b> ${m.name}(${m.score})</span>`;
         }).join(', ');
 
         return `
-          <div class="party-sub-card">
-            <div style="font-weight:bold; color:#1864ab; font-size:0.95rem;">
-              ⚔️ ${item.party.bossName} (파티 ${item.party.partyNumber})
+          <div class="party-sub-card" style="border-left-color: ${color.border}; background-color: ${color.bg};">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-weight:bold; color: ${color.border}; font-size: 1rem;">
+                ⚔️ ${item.party.bossName}
+              </span>
+              <span style="background: ${color.badgeBg}; color: ${color.badgeText}; font-size: 0.8rem; font-weight: bold; padding: 2px 8px; border-radius: 12px; border: 1px solid ${color.border};">
+                파티 ${item.party.partyNumber}
+              </span>
             </div>
-            <div style="font-size:0.88rem; color:#495057; margin-top:4px;">
-              - 파티 스펙 합: <b>${sum}</b> (요구치: ${item.party.targetScore}) / 인원: ${item.party.members.length}명<br>
+            <div style="font-size:0.88rem; color:#495057; margin-top:6px; line-height: 1.5;">
+              - 요구 수치: <b>${sum}</b> / ${item.party.targetScore} (인원: ${item.party.members.length}명)<br>
               - 참여 멤버: ${membersText}
             </div>
           </div>
