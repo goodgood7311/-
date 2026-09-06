@@ -232,7 +232,7 @@
     }
   }
 
-  // Firebase 실시간 수신 리스너 (빈 배열 안전 보정 추가)
+  // Firebase 실시간 수신 리스너
   function listenDatabase() {  
     if (!db) return;
     db.ref('raid_data').on('value', (snapshot) => {
@@ -241,10 +241,11 @@
         bosses = data.bosses || [];
         groups = data.groups || {};
 
-        // Firebase에서 빈 배열이 사라지는 현상 방지
+        // 빈 배열 누락 방지 안전 보정
         Object.keys(groups).forEach(gName => {
-          if (!groups[gName].chars) groups[gName].chars = [];
-          if (!groups[gName].schedule) groups[gName].schedule = [];
+          if (!groups[gName]) groups[gName] = { chars: [], schedule: [] };
+          if (!Array.isArray(groups[gName].chars)) groups[gName].chars = [];
+          if (!Array.isArray(groups[gName].schedule)) groups[gName].schedule = [];
         });
         bosses.forEach(b => {
           if (!b.members) b.members = [];
@@ -375,26 +376,44 @@
     }
   }
 
-  // --- 그룹 및 캐릭터 관리 ---
+  // --- 그룹 및 캐릭터 관리 (두 번째 그룹 생성 오류 해결) ---
   function createNewGroup() {
-    const name = document.getElementById('newGroupName').value.trim();
+    const nameInput = document.getElementById('newGroupName');
+    const name = nameInput.value.trim();
     if (!name) { alert('그룹명을 입력하세요.'); return; }
-    if (groups[name]) { alert('이미 존재하는 그룹명입니다.'); return; }
-
-    groups[name] = { chars: [], schedule: [] };
-    pushCloudData();
-    document.getElementById('newGroupName').value = '';
     
+    if (!groups || typeof groups !== 'object') {
+      groups = {};
+    }
+
+    if (Object.prototype.hasOwnProperty.call(groups, name)) {
+      alert('이미 존재하는 그룹명입니다. 다른 이름을 사용해주세요.');
+      return;
+    }
+
+    // 그룹 객체 생성
+    groups[name] = { chars: [], schedule: [] };
+    nameInput.value = '';
+    
+    // UI 및 드롭다운 즉시 갱신 후 선택
     updateGroupDropdown();
     switchGroup(name);
+    
+    // Firebase 클라우드 동기화
+    pushCloudData();
   }
 
   function updateGroupDropdown() {
     const sel = document.getElementById('groupSelect');
     const prev = activeGroup;
+    const groupKeys = groups ? Object.keys(groups) : [];
+    
     sel.innerHTML = '<option value="">-- 그룹을 선택하세요 --</option>' + 
-      Object.keys(groups).map(g => `<option value="${g}">${g}</option>`).join('');
-    if (prev && groups[prev]) sel.value = prev;
+      groupKeys.map(g => `<option value="${g}">${g}</option>`).join('');
+    
+    if (prev && groups && groups[prev]) {
+      sel.value = prev;
+    }
   }
 
   function switchGroup(groupName) {
@@ -402,7 +421,7 @@
     const display = document.getElementById('activeGroupDisplay');
     const select = document.getElementById('groupSelect');
 
-    if (!activeGroup) {
+    if (!activeGroup || !groups || !groups[activeGroup]) {
       display.innerText = '작업 대상: 그룹을 먼저 선택해주세요.';
       select.value = '';
       clearScheduleUI();
@@ -432,14 +451,15 @@
     });
 
     delete groups[activeGroup];
+    const prevDeleted = activeGroup;
     activeGroup = null;
-    pushCloudData();
+    
     updateGroupDropdown();
     switchGroup(null);
     renderBosses();
+    pushCloudData();
   }
 
-  // [수정] 캐릭터 저장 시 방어 코드 및 즉각 갱신 로직 추가
   function saveCharacterToGroup() {
     if (!activeGroup) { alert('그룹을 먼저 선택하거나 생성해주세요.'); return; }
     
@@ -462,14 +482,10 @@
       return;
     }
 
-    // 배열에 캐릭터 추가
     groups[activeGroup].chars.push({ name, score });
     
-    // UI 즉시 반영
     renderGroupChars();
     updateCharAssignSelect();
-
-    // Firebase 클라우드 동기화
     pushCloudData();
 
     nameInput.value = '';
